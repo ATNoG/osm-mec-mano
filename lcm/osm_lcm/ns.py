@@ -7637,6 +7637,7 @@ class NsLcm(LcmBase):
                 "VDUR_NAME": vdur_name,
                 "KDUR_NAME": kdur_name,
                 "ELEMENT_TYPE": element_type,
+                "DIOGO": "Diogo",
             }
             ## Diogo
             logging_text = f"Diogo Maninho da Street "
