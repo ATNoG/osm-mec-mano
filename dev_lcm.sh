@@ -10,7 +10,7 @@ function build {
     echo "Building LCM"
     docker build -t $DOCKER_REPOSITORY/lcm:$VERSION -f devops/Dockerfile.lcm .
     docker push $DOCKER_REPOSITORY/lcm:$VERSION
-    docker rmi $DOCKER_REPOSITORY/lcm:$VERSION
+    # docker rmi $DOCKER_REPOSITORY/lcm:$VERSION
 }
 
 function apply {
@@ -20,8 +20,8 @@ function apply {
 }
 
 function undo {
-    # Rollout undo 1 step
-    kubectl rollout undo -n osm deployment/lcm
+    # Use the default LCM image
+    kubectl patch deployment -n osm lcm --type='json' -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/imagePullPolicy", "value": "IfNotPresent"}, {"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "opensourcemano/lcm:15"}]'
 }
 
 
