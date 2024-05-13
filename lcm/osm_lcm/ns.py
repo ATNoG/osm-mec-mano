@@ -7634,15 +7634,11 @@ class NsLcm(LcmBase):
                 "EXPORTER_POD_PORT": host_port,
                 "NSR_ID": nsr_id,
                 "VNF_MEMBER_INDEX": vnf_member_index,
+                "VDU_ID": vdu_id,
                 "VDUR_NAME": vdur_name,
                 "KDUR_NAME": kdur_name,
                 "ELEMENT_TYPE": element_type,
-                "DIOGO": "Diogo",
             }
-            ## Diogo
-            logging_text = f"Diogo Maninho da Street "
-            self.logger.info(logging_text + "Enter")
-            ##
         else:
             metric_path = ee_config_descriptor["metric-path"]
             target_port = ee_config_descriptor["metric-port"]
