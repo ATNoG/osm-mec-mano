@@ -1,0 +1,215 @@
+# Copyright 2020 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+#     Unless required by applicable law or agreed to in writing, software
+#     distributed under the License is distributed on an "AS IS" BASIS,
+#     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#     See the License for the specific language governing permissions and
+#     limitations under the License.
+name: osm
+bundle: kubernetes
+description: Local bundle for development
+applications:
+  zookeeper:
+    charm: zookeeper-k8s
+    channel: latest/edge
+    scale: 1
+    storage:
+      data: 100M
+    annotations:
+      gui-x: 0
+      gui-y: 500
+  mariadb:
+    charm: charmed-osm-mariadb-k8s
+    scale: 1
+    series: kubernetes
+    storage:
+      database: 50M
+    options:
+      password: manopw
+      root_password: osm4u
+      user: mano
+    annotations:
+      gui-x: -300
+      gui-y: -250
+  kafka:
+    charm: kafka-k8s
+    channel: latest/edge
+    scale: 1
+    trust: true
+    storage:
+      data: 100M
+    annotations:
+      gui-x: 0
+      gui-y: 250
+  mongodb:
+    charm: mongodb-k8s
+    channel: latest/stable
+    scale: 1
+    series: kubernetes
+    storage:
+      db: 50M
+    annotations:
+      gui-x: 0
+      gui-y: 0
+  nbi:
+    charm: ./nbi/osm-nbi.charm
+    scale: 1
+    resources:
+      image: opensourcemano/nbi:testing-daily
+    series: kubernetes
+    options:
+      database_commonkey: osm
+      auth_backend: keystone
+      log_level: DEBUG
+    annotations:
+      gui-x: 0
+      gui-y: -250
+  ro:
+    charm: ./ro/osm-ro.charm
+    scale: 1
+    resources:
+      image: opensourcemano/ro:testing-daily
+    series: kubernetes
+    options:
+      log_level: DEBUG
+    annotations:
+      gui-x: -300
+      gui-y: 250
+  ng-ui:
+    charm: ./ng-ui/osm-ng-ui.charm
+    scale: 1
+    resources:
+      image: opensourcemano/ng-ui:testing-daily
+    series: kubernetes
+    annotations:
+      gui-x: 600
+      gui-y: 0
+  lcm:
+    charm: ./lcm/osm-lcm.charm
+    scale: 1
+    resources:
+      image: opensourcemano/lcm:testing-daily
+    series: kubernetes
+    options:
+      database_commonkey: osm
+      log_level: DEBUG
+    annotations:
+      gui-x: -300
+      gui-y: 0
+  mon:
+    charm: ./mon/osm-mon.charm
+    scale: 1
+    resources:
+      image: opensourcemano/mon:testing-daily
+    series: kubernetes
+    options:
+      database_commonkey: osm
+      log_level: DEBUG
+      keystone_enabled: true
+    annotations:
+      gui-x: 300
+      gui-y: 0
+  pol:
+    charm: ./pol/osm-pol.charm
+    scale: 1
+    resources:
+      image: opensourcemano/pol:testing-daily
+    series: kubernetes
+    options:
+      log_level: DEBUG
+    annotations:
+      gui-x: -300
+      gui-y: 500
+  pla:
+    charm: ./pla/osm-pla.charm
+    scale: 1
+    resources:
+      image: opensourcemano/pla:testing-daily
+    series: kubernetes
+    options:
+      log_level: DEBUG
+    annotations:
+      gui-x: 600
+      gui-y: -250
+  prometheus:
+    charm: osm-prometheus
+    channel: latest/edge
+    scale: 1
+    series: kubernetes
+    storage:
+      data: 50M
+    options:
+      default-target: "mon:8000"
+    annotations:
+      gui-x: 300
+      gui-y: 250
+  grafana:
+    charm: osm-grafana
+    channel: latest/edge
+    scale: 1
+    series: kubernetes
+    annotations:
+      gui-x: 300
+      gui-y: 500
+  keystone:
+    charm: osm-keystone
+    channel: latest/edge
+    resources:
+      keystone-image: opensourcemano/keystone:testing-daily
+    scale: 1
+    annotations:
+      gui-x: 300
+      gui-y: -250
+relations:
+  - - grafana:prometheus
+    - prometheus:prometheus
+  - - kafka:zookeeper
+    - zookeeper:zookeeper
+  - - keystone:db
+    - mariadb:mysql
+  - - lcm:kafka
+    - kafka:kafka
+  - - lcm:mongodb
+    - mongodb:database
+  - - ro:ro
+    - lcm:ro
+  - - ro:kafka
+    - kafka:kafka
+  - - ro:mongodb
+    - mongodb:database
+  - - pol:kafka
+    - kafka:kafka
+  - - pol:mongodb
+    - mongodb:database
+  - - mon:mongodb
+    - mongodb:database
+  - - mon:kafka
+    - kafka:kafka
+  - - pla:kafka
+    - kafka:kafka
+  - - pla:mongodb
+    - mongodb:database
+  - - nbi:mongodb
+    - mongodb:database
+  - - nbi:kafka
+    - kafka:kafka
+  - - nbi:prometheus
+    - prometheus:prometheus
+  - - nbi:keystone
+    - keystone:keystone
+  - - mon:prometheus
+    - prometheus:prometheus
+  - - ng-ui:nbi
+    - nbi:nbi
+  - - mon:keystone
+    - keystone:keystone
+  - - mariadb:mysql
+    - pol:mysql
+  - - grafana:db
+    - mariadb:mysql

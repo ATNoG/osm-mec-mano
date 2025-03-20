@@ -1,0 +1,42 @@
+#######################################################################################
+# Copyright ETSI Contributors and Others.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#######################################################################################
+
+# Base inputs, unlikely to change
+export GITEA_ENV_NAME=${GITEA_ENV_NAME:-gitea-at-osm}
+
+# Chart values, selecting the mode of deployment
+export GITEA_CHART_VALUES_FILE=${GITEA_CHART_VALUES_FILE:-values-standalone.yaml}
+
+# Location where credentials should be saved
+export CREDENTIALS_DIR=${CREDENTIALS_DIR:-../../../.credentials}; export CREDENTIALS_DIR=$(readlink -f "${CREDENTIALS_DIR}")
+
+# Admin user
+export GITEA_ADMINISTRATOR_USERNAME=${GITEA_ADMINISTRATOR_USERNAME:-osm-admin}
+#--------- CHANGE DEFAULT:
+export GITEA_ADMINISTRATOR_PASSWORD=${GITEA_ADMINISTRATOR_PASSWORD:-PleaseChange123%}
+#------------------------
+export GITEA_ADMINISTRATOR_TOKEN_NAME=${GITEA_ADMINISTRATOR_TOKEN_NAME:-admin-token}
+
+# Regular user
+export GITEA_STD_USERNAME=${GITEA_STD_USERNAME:-osm-developer}
+#--------- CHANGE DEFAULT:
+export GITEA_STD_USER_PASS=${GITEA_STD_USER_PASS:-PleaseChange123!}
+#------------------------
+export GITEA_STD_TOKEN_NAME=${GITEA_STD_TOKEN_NAME:-developer-token}
+
+# (optional) Organization name
+export GITEA_EXTRA_ORGANIZATION=${GITEA_EXTRA_ORGANIZATION:-OSM}

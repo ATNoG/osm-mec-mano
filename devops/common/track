@@ -1,0 +1,96 @@
+#!/bin/bash
+# This file is meant to be SOURCED
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+
+function track(){
+# Tracks events by sending HTTP GET requests with query strings to a web server
+# Input:
+# - First argument (mandatory): event name
+# - Rest of arguments:
+#   - If they exist, they correspond to tuples of operation-value-comment-tags
+#     - operation: particular operation in an event
+#     - value: particular value for an operation
+#     - comment
+#       - none will be passed when empty
+#       - will be parsed to replace spaces by underscores
+#     - tags
+#       - none will be passed when empty
+#       - will be parsed to replace spaces by ~
+#   - If no arguments:
+#     - operation: like event
+#     - value: ""
+#     - comment: ""
+#     - tags: ""
+# Output:
+#   Sends as many HTTP requests as operations with the following query string
+#     "&{OSM_TRACK_INSTALLATION_ID}&{TIMESTAMP}&{EVENT}&{OPERATION}&{VALUE}&{COMMENT}&{TAGS}"
+#
+
+    if [ $# -lt 1 ]; then
+        echo "Unexpected error in track function. At least 1 arg is expected: event"
+        return 1
+    fi
+
+    osm_track_event_name=$1
+
+    ctime=`date +%s`
+
+    query_string=""
+    query_string="${query_string}&installation_id=${OSM_TRACK_INSTALLATION_ID}"
+    query_string="${query_string}&local_ts=${ctime}"
+    query_string="${query_string}&event=${osm_track_event_name}"
+
+    shift 1
+    if [ $# -eq 0 ]; then
+        operation="${osm_track_event_name}"
+        value=""
+        comment=""
+        tags=""
+        final_query_string="${query_string}"
+        final_query_string="${final_query_string}&operation=${operation}"
+        final_query_string="${final_query_string}&value=${value}"
+        final_query_string="${final_query_string}&comment=${comment}"
+        final_query_string="${final_query_string}&tags=${tags}"
+        url="https://osm.etsi.org/InstallLog.php?${final_query_string}"
+        echo "Track $osm_track_event_name $operation: ${url}"
+        LANG=C wget -q -O /dev/null "$url"
+    else
+        while (( "$#" > 0 )); do
+            operation="${1:-${osm_track_event_name}}"
+            shift 1
+            value="${1:-}"
+            value="${value// /_}"
+            shift 1
+            comment="${1:-}"
+            comment="${comment// /_}"
+            shift 1
+            tags="${1:-}"
+            tags="${tags//,/\~}"
+            shift 1
+            [ "$value" == "none" ] && value=""
+            [ "$comment" == "none" ] && comment=""
+            [ "$tags" == "none" ] && tags=""
+            final_query_string="${query_string}"
+            final_query_string="${final_query_string}&operation=${operation}"
+            final_query_string="${final_query_string}&value=${value}"
+            final_query_string="${final_query_string}&comment=${comment}"
+            final_query_string="${final_query_string}&tags=${tags}"
+            url="https://osm.etsi.org/InstallLog.php?${final_query_string}"
+            echo "Track $osm_track_event_name $operation: ${url}"
+            LANG=C wget -q -O /dev/null "$url"
+        done
+    fi
+    return 0
+}

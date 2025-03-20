@@ -1,0 +1,104 @@
+# Copyright 2022 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+#
+# For those usages not covered by the Apache License, Version 2.0 please
+# contact: legal@canonical.com
+#
+# To get in touch with the maintainers, please contact:
+# osm-charmers@lists.launchpad.net
+#
+#
+# This file populates the Configure tab on Charmhub.
+# See https://juju.is/docs/some-url-to-be-determined/ for a checklist and guidance.
+
+options:
+  log-level:
+    default: "INFO"
+    description: |
+      Set the Logging Level.
+
+      Options:
+        - TRACE
+        - DEBUG
+        - INFO
+        - WARN
+        - ERROR
+        - FATAL
+    type: string
+  database-commonkey:
+    description: Database COMMON KEY
+    type: string
+    default: osm
+  # Helm options
+  helm-stable-repo-url:
+    description: Stable repository URL for Helm charts
+    type: string
+    default: https://charts.helm.sh/stable
+  helm-ca-certs:
+    description: CA certificates to validate access to Helm repository
+    type: string
+    default: ""
+  # Debug-mode options
+  debug-mode:
+    type: boolean
+    description: |
+      Great for OSM Developers! (Not recommended for production deployments)
+
+      This action activates the Debug Mode, which sets up the container to be ready for debugging.
+      As part of the setup, SSH is enabled and a VSCode workspace file is automatically populated.
+
+      After enabling the debug-mode, execute the following command to get the information you need
+      to start debugging:
+        `juju run-action <unit name> get-debug-mode-information --wait`
+
+      The previous command returns the command you need to execute, and the SSH password that was set.
+
+      See also:
+        - https://charmhub.io/osm-lcm/configure#lcm-hostpath
+        - https://charmhub.io/osm-lcm/configure#n2vc-hostpath
+        - https://charmhub.io/osm-lcm/configure#common-hostpath
+    default: false
+  lcm-hostpath:
+    type: string
+    description: |
+      Set this config to the local path of the LCM module to persist the changes done during the
+      debug-mode session.
+
+      Example:
+        $ git clone "https://osm.etsi.org/gerrit/osm/LCM" /home/ubuntu/LCM
+        $ juju config lcm lcm-hostpath=/home/ubuntu/LCM
+
+      This configuration only applies if option `debug-mode` is set to true.
+  n2vc-hostpath:
+    type: string
+    description: |
+      Set this config to the local path of the N2VC module to persist the changes done during the
+      debug-mode session.
+
+      Example:
+        $ git clone "https://osm.etsi.org/gerrit/osm/N2VC" /home/ubuntu/N2VC
+        $ juju config lcm n2vc-hostpath=/home/ubuntu/N2VC
+
+      This configuration only applies if option `debug-mode` is set to true.
+  common-hostpath:
+    type: string
+    description: |
+      Set this config to the local path of the common module to persist the changes done during the
+      debug-mode session.
+
+      Example:
+        $ git clone "https://osm.etsi.org/gerrit/osm/common" /home/ubuntu/common
+        $ juju config lcm common-hostpath=/home/ubuntu/common
+
+      This configuration only applies if option `debug-mode` is set to true.

@@ -1,0 +1,172 @@
+#!/bin/bash
+
+# OSM devops/tools - Tool that generates a report for debugging
+#
+# Copyright 2018 Telefonica
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+DIRNAME=$(readlink -f ${BASH_SOURCE[0]})
+DIRNAME=$(dirname $DIRNAME)
+
+#Get versions
+echo "-------------------------------"
+echo "Versions"
+echo "-------------------------------"
+echo "DIRNAME: $DIRNAME"
+echo "docker version:"
+docker version
+echo "lxd version:"
+lxd --version
+echo "juju version:"
+juju --version
+echo "osm-devops deb package:"
+dpkg -l |grep osm-devops
+echo "osm-imdocs osm-im deb package:"
+dpkg -l |grep osm-im
+echo "python-osmclient deb package:"
+dpkg -l |grep
+echo "whereis osm:"
+whereis osm
+echo "which osmclient:"
+which osm
+#dockers deb packages
+echo "dockers deb packages"
+for i in kafka keystone lcm mon mongo nbi pol prometheus ro mysql zookeeper; do
+    echo "docker osm_$i"
+    docker exec $(docker ps -q -f name=osm_$i -l) dpkg -l |grep osm
+done
+#dockers source code
+echo "dockers deb packages"
+echo "MON"
+docker exec -it $(docker ps -aqf "name=osm_mon" -n 1) dpkg -l |egrep -i "osm|n2vc"
+echo "POL"
+docker exec -it $(docker ps -aqf "name=osm_pol" -n 1) dpkg -l |egrep -i "osm|n2vc"
+echo "LCM"
+docker exec -it $(docker ps -aqf "name=osm_lcm" -n 1) dpkg -l |egrep -i "osm|n2vc"
+echo "NBI"
+docker exec -it $(docker ps -aqf "name=osm_nbi" -n 1) dpkg -l |egrep -i "osm|n2vc"
+echo "RO"
+docker exec -it $(docker ps -aqf "name=osm_ro.1" -n 1) dpkg -l |egrep -i "osm|n2vc"
+echo "OSMCLIENT"
+dpkg -l |grep osmclient
+echo "OSM-IM"
+dpkg -l |grep osm-im
+echo "OSM-DEVOPS"
+dpkg -l |grep osm-devops
+
+echo "docker osm_ro"
+docker exec $(docker ps -q -f name=osm_ro -l) git -C /root/RO rev-parse HEAD
+docker exec $(docker ps -q -f name=osm_ro -l) git -C /root/RO describe --tags --long --dirty
+echo "docker osm_lcm"
+docker exec $(docker ps -q -f name=osm_lcm -l) git -C /app rev-parse HEAD
+docker exec $(docker ps -q -f name=osm_lcm -l) git -C /app describe --tags --long --dirty
+echo "docker osm_nbi"
+docker exec $(docker ps -q -f name=osm_nbi -l) git -C /app/NBI rev-parse HEAD
+docker exec $(docker ps -q -f name=osm_nbi -l) git -C /app/NBI describe --tags --long --dirty
+echo "docker osm_mon"
+docker exec $(docker ps -q -f name=osm_mon -l) git -C /mon rev-parse HEAD
+docker exec $(docker ps -q -f name=osm_mon -l) git -C /mon describe --tags --long --dirty
+echo "docker osm_pol"
+docker exec $(docker ps -q -f name=osm_pol -l) git -C /policy_module rev-parse HEAD
+docker exec $(docker ps -q -f name=osm_pol -l) git -C /policy_module describe --tags --long --dirty
+
+#Get configuration files
+echo "-------------------------------"
+echo "Configuration files"
+echo "-------------------------------"
+for i in $(find /etc/osm -type f -exec echo {} \;); do
+    [ -f "$i" ] || continue
+    echo "File $i:"
+    cat $i
+done
+
+#Get status of docker swarm
+echo "-------------------------------"
+echo "Docker swarm status"
+echo "-------------------------------"
+echo "Node ls:"
+docker node ls
+echo "Node inspect self:"
+docker node inspect self --pretty
+echo "Network inspect docker_gwbridge:"
+docker network inspect docker_gwbridge
+echo "Network inspect netOSM:"
+docker network inspect netOSM
+echo "Network inspect netosm:"
+docker network inspect netosm
+
+#Get status of dockers
+echo "-------------------------------"
+echo "Docker status"
+echo "-------------------------------"
+echo "-------------------------------"
+echo "Docker stack ls"
+echo "-------------------------------"
+docker stack ls
+echo "-------------------------------"
+echo "Docker service ls"
+echo "-------------------------------"
+docker service ls
+for i in $(docker stack ps |tail -n +2|awk '{print $1}'); do
+    echo "-------------------------------"
+    echo "Docker stack $i"
+    echo "-------------------------------"
+    docker stack ps $i
+done
+
+#Get log files
+echo
+echo "-------------------------------"
+echo "Log files"
+echo "-------------------------------"
+echo "To be added"
+
+#Get OSM general info
+echo "-------------------------------"
+echo "OSM info"
+echo "-------------------------------"
+for i in vim-list sdnc-list vnfd-list nsd-list ns-list vnf-list; do
+    echo "-------------------------------"
+    echo "OSM info: $i"
+    echo "-------------------------------"
+    osm $i
+done
+
+#Get OSM details
+echo "-------------------------------"
+echo "OSM details"
+echo "-------------------------------"
+for i in vim sdnc vnfd nsd ns; do
+    echo "-------------------------------"
+    echo "OSM details: $i"
+    echo "-------------------------------"
+    for j in $(osm $i-list|tail -n +4|awk '{print $4}'); do
+        echo "-------------------------------"
+        echo "OSM details: vim $j"
+        echo "-------------------------------"
+        osm $i-show $j
+    done
+done
+for i in vnf; do
+    echo "-------------------------------"
+    echo "OSM details: $i"
+    echo "-------------------------------"
+    for j in $(osm $i-list|tail -n +4|awk '{print $2}'); do
+        echo "-------------------------------"
+        echo "OSM details: vim $j"
+        echo "-------------------------------"
+        osm $i-show $j
+    done
+done
+

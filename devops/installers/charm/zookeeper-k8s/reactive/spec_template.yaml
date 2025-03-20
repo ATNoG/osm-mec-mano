@@ -1,0 +1,84 @@
+# Copyright 2021 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+#
+# For those usages not covered by the Apache License, Version 2.0 please
+# contact: legal@canonical.com
+#
+# To get in touch with the maintainers, please contact:
+# osm-charmers@lists.launchpad.net
+##
+
+version: 2
+containers:
+  - name: %(name)s
+    image: %(docker_image_path)s
+    kubernetes:
+      readinessProbe:
+        tcpSocket:
+          port: %(client-port)s
+        initialDelaySeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 6
+        successThreshold: 1
+      livenessProbe:
+        tcpSocket:
+          port: %(client-port)s
+        initialDelaySeconds: 20
+    ports:
+    - containerPort: %(client-port)s
+      name: client
+    - containerPort: %(server-port)s
+      name: server
+    - containerPort: %(leader-election-port)s
+      name: leader-election
+    config:
+        ALLOW_ANONYMOUS_LOGIN: 'yes'
+    command:
+    - sh
+    - -c
+    - "start-zookeeper \
+      --servers=%(zookeeper-units)s \
+      --data_dir=/var/lib/zookeeper/data \
+      --data_log_dir=/var/lib/zookeeper/data/log \
+      --conf_dir=/opt/zookeeper/conf \
+      --client_port=%(client-port)s \
+      --election_port=%(leader-election-port)s \
+      --server_port=%(server-port)s \
+      --tick_time=2000 \
+      --init_limit=10 \
+      --sync_limit=5 \
+      --heap=512M \
+      --max_client_cnxns=60 \
+      --snap_retain_count=3 \
+      --purge_interval=12 \
+      --max_session_timeout=40000 \
+      --min_session_timeout=4000 \
+      --log_level=INFO"
+    # readinessProbe:
+    #   exec:
+    #     command:
+    #     - sh
+    #     - -c
+    #     - "zookeeper-ready 2181"
+    #   initialDelaySeconds: 10
+    #   timeoutSeconds: 5
+    #   failureThreshold: 6
+    #   successThreshold: 1
+    # livenessProbe:
+    #   exec:
+    #     command:
+    #     - sh
+    #     - -c
+    #     - "zookeeper-ready 2181"
+    #   initialDelaySeconds: 20

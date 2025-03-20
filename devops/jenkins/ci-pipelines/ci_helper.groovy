@@ -1,0 +1,220 @@
+/* Copyright 2017 Sandvine
+ *
+ * All Rights Reserved.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License"); you may
+ *   not use this file except in compliance with the License. You may obtain
+ *   a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ *   WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *   License for the specific language governing permissions and limitations
+ *   under the License.
+ */
+
+def get_archive(artifactory_server, mdg, branch, build_name, build_number, pattern='*') {
+    server = Artifactory.server artifactory_server
+
+    println("retrieve archive for ${mdg}/${branch}/${build_name}/${build_number}/${pattern}")
+
+    // if the build name does not contain merge, then this is a patchset/staging job
+    if (!build_name.contains('merge')) {
+        branch += '-staging'
+    }
+    def repo_prefix = 'osm-'
+    def downloadSpec = """{
+     "files": [
+        {
+          "target": "./",
+          "pattern": "${repo_prefix}${mdg}/${branch}/${build_number}/${pattern}"
+        }
+     ]
+    }"""
+
+    println("Searching Artifactory with ${downloadSpec}")
+
+    def results = server.download(downloadSpec)
+    // Save the list of URLs that we need to pass to the dockerfiles for build
+    def debian_packages = []
+    for ( result in results.getDependencies()) {
+        if (result.remotePath.contains(".deb")) {
+            debian_packages.add(result.remotePath)
+        }
+    }
+
+    // workaround.  flatten repo to remove specific build num from the directory
+    sh "cp -R ${branch}/${build_number}/* ."
+    sh "rm -rf ${branch}/${build_number}"
+
+    return debian_packages
+}
+
+def get_env_value(build_env_file,key) {
+    return sh(returnStdout:true,  script: "cat ${build_env_file} | awk -F= '/${key}/{print \$2}'").trim()
+}
+
+def lxc_run(container_name,cmd) {
+    return sh(returnStdout: true, script: "lxc exec ${container_name} -- ${cmd}").trim()
+}
+
+def lxc_file_push(container_name,file,destination) {
+    return sh(returnStdout: true, script: "lxc file push ${file} ${container_name}/${destination}").trim()
+}
+
+// start a http server
+// return the http server URL
+def start_http_server(repo_dir,server_name,port) {
+    sh "docker run -dit --name ${server_name} -p ${port}:80 -v ${repo_dir}:/usr/local/apache2/htdocs/ httpd:2.4"
+    def http_server_ip = sh(returnStdout:true,  script: "docker inspect --format '{{ .NetworkSettings.IPAddress }}' ${server_name}").trim()
+    return "http://${http_server_ip}:${port}/"
+}
+
+def check_status_http_server(ip, port) {
+    alive = false
+    timeout(time: 1, unit: 'MINUTES') {
+        while (!alive) {
+            output = sh(
+                returnStatus: true,
+                script: "wget http://${ip}:${port}/release/dists/unstable/Release")
+            alive = (output == 0)
+            if (!alive) {
+                sleep(time: 5, unit: 'SECONDS')
+            }
+        }
+    }
+    println('HTTP server is ready and accepting http connections')
+    return
+}
+
+def lxc_get_file(container_name,file,destination) {
+    sh "lxc file pull ${container_name}/${file} ${destination}"
+}
+
+def systest_run(container_name, test, source_rc = null) {
+    // need to get the SO IP inside the running container
+    so_ip = lxc_run(container_name,"lxc list SO-ub -c 4|grep eth0 |awk '{print \$2}'")
+    ro_ip = lxc_run(container_name,"lxc list RO -c 4|grep eth0 |awk '{print \$2}'")
+    //container_ip = get_ip_from_container(container_name)
+
+    if ( source_rc ) {
+        pre_source = "/tmp/" + source_rc.substring(source_rc.lastIndexOf('/')+1)
+
+        lxc_file_push(container_name,source_rc,pre_source)
+        result = lxc_run(container_name, "sh -c '. ${pre_source}; make -C devops/systest OSM_HOSTNAME=${so_ip} OSM_RO_HOSTNAME=${ro_ip} ${test}'")
+        echo result
+    }
+    else
+    {
+        result = lxc_run(container_name, "make -C devops/systest OSM_HOSTNAME=${so_ip} OSM_RO_HOSTNAME=${ro_ip} ${test}")
+        echo result
+    }
+    lxc_get_file(container_name, "/root/devops/systest/reports/pytest-${test}.xml",'.')
+}
+
+def get_ip_from_container( container_name ) {
+    return sh(returnStdout: true, script: "lxc list ${container_name} -c 4|grep eth0 |awk '{print \$2}'").trim()
+}
+
+def archive(artifactory_server,mdg,branch,status) {
+    server = Artifactory.server artifactory_server
+
+    def properties = ""
+    //def properties = "branch=${branch};status=${status}"
+    def repo_prefix = 'osm-'
+
+    // if the build name does not contain merge, then this is a patchset/staging job
+    if ( !JOB_NAME.contains('merge') ) {
+        branch += '-staging'
+    }
+    def uploadSpec = """{
+     "files": [
+        {
+          "pattern": "dists/*.gz",
+          "target": "${repo_prefix}${mdg}/${branch}/${BUILD_NUMBER}/",
+          "props": "${properties}",
+          "flat": false
+        },
+        {
+          "pattern": "dists/*Packages",
+          "target": "${repo_prefix}${mdg}/${branch}/${BUILD_NUMBER}/",
+          "props": "${properties}",
+          "flat": false
+        },
+        {
+          "pattern": "dist/*.whl",
+          "target": "${repo_prefix}${mdg}/${branch}/${BUILD_NUMBER}/",
+          "props": "${properties}",
+          "flat": false
+        },
+        {
+          "pattern": "pool/*/*.deb",
+          "target": "${repo_prefix}${mdg}/${branch}/${BUILD_NUMBER}/",
+          "props": "${properties}",
+          "flat": false
+        },
+        {
+          "pattern": "changelog/*",
+          "target": "${repo_prefix}${mdg}/${branch}/${BUILD_NUMBER}/",
+          "props": "${properties}",
+          "flat": false
+        }]
+    }"""
+
+    buildInfo = server.upload(uploadSpec)
+    //buildInfo.retention maxBuilds: 4
+    //buildInfo.retention deleteBuildArtifacts: false
+
+    server.publishBuildInfo(buildInfo)
+
+    // store the build environment into the jenkins artifact storage
+    sh 'env > build.env'
+    archiveArtifacts artifacts: "build.env", fingerprint: true
+}
+
+
+//CANNOT use build promotion with OSS version of artifactory
+// For now, will publish downloaded artifacts into a new repo.
+def promote_build(artifactory_server,mdg,branch,buildInfo) {
+    println("Promoting build: mdg: ${mdg} branch: ${branch} build: ${buildInfo.name}/${buildInfo.number}")
+
+    server = Artifactory.server artifactory_server
+
+    //def properties = "branch=${branch};status=${status}"
+    def repo_prefix = 'osm-'
+    def build_name = "${mdg}-stage_2 :: ${branch}"
+
+    def promotionConfig = [
+        // Mandatory parameters
+        "buildName"          : buildInfo.name,
+        "buildNumber"        : buildInfo.number,
+        'targetRepo'         : 'osm-release',
+
+        // Optional parameters
+        'comment'            : 'this is the promotion comment',
+        'sourceRepo'         : "${repo_prefix}${mdg}",
+        'status'             : 'Testing',
+        'includeDependencies': true,
+        'copy'               : true,
+        // 'failFast' is true by default.
+        // Set it to false, if you don't want the promotion to abort upon receiving the first error.
+        'failFast'           : true
+    ]
+
+    server.promote promotionConfig
+}
+
+def get_mdg_from_project(project) {
+    // split the project.
+    def values = project.split('/')
+    if ( values.size() > 1 ) {
+        return values[1]
+    }
+    // no prefix, likely just the project name then
+    return project
+}
+
+
+return this

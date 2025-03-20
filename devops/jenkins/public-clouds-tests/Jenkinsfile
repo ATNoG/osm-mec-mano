@@ -1,0 +1,216 @@
+/* Copyright ETSI Contributors and Others
+ *
+ * All Rights Reserved.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License"); you may
+ *   not use this file except in compliance with the License. You may obtain
+ *   a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ *   WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *   License for the specific language governing permissions and limitations
+ *   under the License.
+ */
+
+pipeline {
+    parameters {
+        // string(defaultValue: 'artifactory-osm', description: '', name: 'ARTIFACTORY_SERVER')
+
+        // Parameters to define the specific OSM version to test
+        // --> Defaults to latest stable version of Release FOURTEEN
+        string(defaultValue: 'https://osm-download.etsi.org/ftp/osm-16.0-sixteen/install_osm.sh', description: 'URL to OSM installer', name: 'INSTALLER_URL')
+        string(defaultValue: 'testing-daily', description: 'Release for OSM binaries (REPO_BASE)', name: 'REPO_BASE')
+        string(defaultValue: 'testing-daily', description: 'OSM docker tag (DOCKER_TAG)', name: 'DOCKER_TAG')
+        string(defaultValue: 'testing', description: 'Repository name for OSM packages (REPO_NAME)', name: 'REPO_NAME')
+
+        // Parameters for docker run
+        string(defaultValue: 'opensourcemano/tests', description: 'Name of docker image for client-side of Robot tests', name: 'TEST_IMAGE')
+        string(defaultValue: 'testing-daily', description: 'Tag of docker image for client-side', name: 'TEST_TAG')
+
+        // Parameters to define SSH keys (Jenkins secret) used when creating VMs
+        string(defaultValue: '', description: 'Jenkins credential containing SSH private key used in VMs', name: 'SSH_PRIVATE_KEY')
+        string(defaultValue: '', description: 'Jenkins credential containing SSH public key used in VMs', name: 'SSH_PUBLIC_KEY')
+
+        // Parameter to set the target environment
+        // Parameter to set the name of secret in Jenkins for Azure JSON credentials
+        string(defaultValue: 'azure-credentials', description: 'Jenkins secret that contains Azure JSON credentials', name: 'AZURE_CREDENTIALS')
+        // File format (take care of brackets in clientId):
+        // {
+        // "clientId": "{<client-id>}",
+        // "clientSecret": "<secret>",
+        // "subscriptionId": "<subscription-id>",
+        // "tenantId": "<tenant-id>",
+        // "activeDirectoryEndpointUrl": "https://login.microsoftonline.com",
+        // "resourceManagerEndpointUrl": "https://management.azure.com/",
+        // "activeDirectoryGraphResourceId": "https://graph.windows.net/",
+        // "sqlManagementEndpointUrl": "https://management.core.windows.net:8443/",
+        // "galleryEndpointUrl": "https://gallery.azure.com/",
+        // "managementEndpointUrl": "https://management.core.windows.net/"
+        // }
+
+        // Parameter to set the tag for selecting Robot test to be run
+        string(defaultValue: 'azure', description: 'Tag for selecting Robot test to be run', name: 'ROBOT_RUN_TAG')
+
+        // Configuration of thresholds for Robot tests
+        string(defaultValue: '99.0', description: '% passed Robot tests to mark the build as passed', name: 'ROBOT_PASS_THRESHOLD')
+        string(defaultValue: '80.0', description: '% passed Robot tests to mark the build as unstable (if lower, it will be failed)', name: 'ROBOT_UNSTABLE_THRESHOLD')
+    }
+    environment {
+        // Azure environment
+        CLOUD_TYPE                 = 'azure'
+        SOURCE_IMAGE_NAME          = 'Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest'
+        FLAVOR_NAME                = 'Standard_D4as_v4'
+        K8S_FLAVOR_NAME            = 'Standard_A2_v2'
+        USE_PAAS_K8S               = 'FALSE'
+        PRIORITY                   = 'Regular'
+        RESOURCE_GROUP             = 'OSM_CICD_GROUP'
+        VNET_NAME                  = 'OSM-CICD-net'
+        VIM_MGMT_NET               = 'OSM-CICD-subnet'
+        VIM_TARGET                 = 'azure-etsi'
+        AZURE_FLAVORS_PATTERN      = '^Standard'
+        AZURE_REGION               = 'westeurope'
+        OSM_VIM_MULTIPLIER_TIMEOUT = '4.0'
+
+    /*
+        // Openstack environment
+        CLOUD_TYPE                 = 'openstack'
+        OS_CLOUD                   = 'etsi-vim-telefonica'
+        OS_DOMAIN_NAME             = 'Default'
+        VIM_TARGET                 = 'etsi-vim-telefonica'
+        VIM_MGMT_NET               = 'osm-ext'
+        VIM_EXT_NET                = 'osm-ext'
+        OVERRIDES                  = '--override-epa'
+        FLAVOR_NAME                = 'osm.sanity'
+        SOURCE_IMAGE_NAME          = 'ubuntu22.04'
+        SSH_KEY_NAME               = 'niv2020'
+        SDNC_USER                  = 'karaf'
+        SDNC_PASSWORD              = 'karaf'
+        SDNC_URL                   = 'http://172.21.248.11:8181'
+        SDNC_TYPE                  = 'onos_vpls'
+
+        // Google Cloud environment
+        CLOUD_TYPE                 = 'gcp'
+        GCP_PROJECT                = 'telcocloudpocs'
+        GCP_ZONE                   = 'europe-west1-b'
+        GCP_MACHINE_TYPE           = 'e2-standard-4'
+        GCP_DISK_SIZE              = '40'
+        GCP_IMAGE_PROJECT          = 'ubuntu-os-cloud'
+        GCP_IMAGE_FAMILY           = 'ubuntu-2204-lts'
+        VIM_TARGET                 = 'gcp'
+        VIM_MGMT_NET               = 'default'
+        OSM_VIM_MULTIPLIER_TIMEOUT = '4.0'
+    */
+    }
+    agent {
+        docker {
+            label 'osm4'
+            image "${params.TEST_IMAGE}:${params.TEST_TAG}"
+            args "-u root:root --entrypoint=''"
+        }
+    }
+    stages {
+        stage('Set environment') {
+            steps {
+                script {
+                    if (params.SSH_PUBLIC_KEY == '') {
+                        // Gererate SSH private and public keys
+                        sh "mkdir -m 700 ~/.ssh"
+                        sh "ssh-keygen -t rsa -f ~/.ssh/id_rsa -N ''"
+                    }
+                    else {
+                        // SSH private and public keys from Jenkins credentials
+                        sh "mkdir -m 700 ~/.ssh"
+                        withCredentials([file(credentialsId: "${params.SSH_PRIVATE_KEY}", variable: 'SSHPATH')]) {
+                            sh "cp ${SSHPATH} ~/.ssh/id_rsa"
+                        }
+                        withCredentials([file(credentialsId: "${params.SSH_PUBLIC_KEY}", variable: 'SSHPATH')]) {
+                            sh "cp ${SSHPATH} ~/.ssh/id_rsa.pub"
+                        }
+                        sh "chmod 400 ~/.ssh/id_rsa ~/.ssh/id_rsa.pub"
+                    }
+                    // This file is used by some Robot test (BASIC12)
+                    sh "cp ~/.ssh/id_rsa ~/osm_id_rsa"
+                    sh "echo Reading credential ${params.AZURE_CREDENTIALS}"
+                }
+                // Azure credentials
+                withCredentials([file(credentialsId: "${params.AZURE_CREDENTIALS}", variable: 'FILE')]) {
+                    sh "cp ${FILE} ~/azure-creds.json"
+                    sh """
+                    set +x; \
+                    AZURE_CLIENT_ID=\$(cat ~/azure-creds.json | jq -r .clientId  | sed s/[{}]//g) ; \
+                    AZURE_SECRET=\$(cat ~/azure-creds.json | jq -r .clientSecret) ; \
+                    AZURE_TENANT=\$(cat ~/azure-creds.json | jq -r .tenantId) ; \
+                    az login --service-principal --username \$AZURE_CLIENT_ID --password \$AZURE_SECRET --tenant \$AZURE_TENANT
+                    """
+                    sh "az vm list -o table"
+                }
+            }
+        }
+        stage('Create k8s cluster') {
+            steps {
+                sh "/robot-systest/cloud-scripts/create-k8s.sh"
+                sh "cat /robot-systest/results/k8s_environment.rc"
+            }
+        }
+        stage('Install OSM') {
+            steps {
+                sh "/robot-systest/cloud-scripts/create-osm-vm.sh"
+                sh "cat /robot-systest/results/osm_environment.rc"
+                sh ". /robot-systest/results/osm_environment.rc ; /robot-systest/cloud-scripts/remote-install-osm.sh"
+            }
+        }
+        stage('Add VIM and K8s cluster to OSM') {
+            steps {
+                sh """
+                    . /robot-systest/results/osm_environment.rc ; \
+                    . /robot-systest/results/k8s_environment.rc ; \
+                    osm version ; \
+                    set +x; \
+                    export AZURE_CLIENT_ID=\$(cat ~/azure-creds.json | jq -r .clientId  | sed s/[{}]//g) ; \
+                    export AZURE_SECRET=\$(cat ~/azure-creds.json | jq -r .clientSecret) ; \
+                    export AZURE_TENANT=\$(cat ~/azure-creds.json | jq -r .tenantId) ; \
+                    export AZURE_SUBSCRIPTION_ID=\$(cat ~/azure-creds.json | jq -r .subscriptionId) ; \
+                    /robot-systest/cloud-scripts/add-vim-and-k8scluster.sh
+                    """
+            }
+
+        }
+        stage('Run Robot tests') {
+            steps {
+                sh """
+                    . /robot-systest/results/osm_environment.rc ; \
+                    . /robot-systest/results/k8s_environment.rc ; \
+                    /robot-systest/run_test.sh -t ${params.ROBOT_RUN_TAG}
+                    """
+            }
+        }
+    }
+    post {
+        always {
+            echo "Retrieve container logs"
+            sh """
+            . /robot-systest/results/osm_environment.rc ; \
+            /robot-systest/cloud-scripts/remote-extract-logs.sh
+            """
+
+            echo "Save results"
+            sh "rm -rf results"
+            sh "cp -var /robot-systest/results /robot-systest/reports/* ."
+            archiveArtifacts artifacts: 'results/**/*', fingerprint: true
+
+            echo "Updates the Robot dashboard in Jenkins"
+            robot outputPath: '.', passThreshold: "${params.ROBOT_PASS_THRESHOLD}", unstableThreshold: "${params.ROBOT_UNSTABLE_THRESHOLD}"
+
+            echo "Destroy the K8s cluster"
+            sh '. /robot-systest/results/k8s_environment.rc ; /robot-systest/cloud-scripts/delete-k8s.sh'
+
+            echo "Destroy the OSM host"
+            sh '. /robot-systest/results/osm_environment.rc ; /robot-systest/cloud-scripts/delete-osm-vm.sh'
+            sh "az vm list -o table"
+        }
+    }
+}
+

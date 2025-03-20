@@ -1,0 +1,63 @@
+# Copyright 2022 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+#
+# For those usages not covered by the Apache License, Version 2.0 please
+# contact: legal@canonical.com
+#
+# To get in touch with the maintainers, please contact:
+# osm-charmers@lists.launchpad.net
+#
+#
+# This file populates the Overview on Charmhub.
+# See https://juju.is/docs/some-url-to-be-determined/ for a checklist and guidance.
+
+name: osm-pol
+
+# The following metadata are human-readable and will be published prominently on Charmhub.
+
+display-name: OSM POL
+
+summary: OSM Policy module (POL)
+
+description: |
+  A Kubernetes operator that deploys the Policy module of OSM.
+
+  TODO include description of the module!!!
+
+  This charm doesn't make sense on its own.
+  See more:
+    - https://charmhub.io/osm
+
+containers:
+  pol:
+    resource: pol-image
+
+# This file populates the Resources tab on Charmhub.
+
+resources:
+  pol-image:
+    type: oci-image
+    description: OCI image for pol
+    upstream-source: opensourcemano/pol
+
+requires:
+  kafka:
+    interface: kafka
+    limit: 1
+  mongodb:
+    interface: mongodb_client
+    limit: 1
+  mysql:
+    interface: mysql
+    limit: 1

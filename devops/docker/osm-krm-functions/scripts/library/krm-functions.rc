@@ -1,0 +1,2032 @@
+#!/bin/bash
+#######################################################################################
+# Copyright ETSI Contributors and Others.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#######################################################################################
+
+
+
+function generator_encrypted_secret_cloud_credentials() {
+  local CLOUD_CREDENTIALS_FILENAME="$1"
+  local SECRET_NAME="$2"
+  local PUBLIC_KEY="$3"
+  local SECRET_MANIFEST_FILENAME="${4:-secret-${SECRET_NAME}.yaml}"
+
+  join_lists \
+    <(cat) \
+    <(cat "${CREDENTIALS_DIR}/${CLOUD_CREDENTIALS_FILENAME}" | \
+      kubectl create secret generic ${SECRET_NAME} \
+        --namespace crossplane-system \
+        --from-file creds=/dev/stdin \
+        -o yaml --dry-run=client | \
+      encrypt_secret_from_stdin "${PUBLIC_KEY_MGMT}" | \
+      manifest2list | \
+      set_filename_to_items "${SECRET_MANIFEST_FILENAME}")
+}
+
+
+# Create ProviderConfig for Azure
+function add_providerconfig_for_azure() {
+  # Inputs
+  local CLOUD_CREDENTIALS="$1"
+  local NEW_SECRET_NAME="$2"
+  local PROVIDERCONFIG_NAME="${3:-default}"
+  local PUBLIC_KEY="${4:-${PUBLIC_KEY_MGMT}}"
+  local TARGET_FOLDER="${5:-${MGMT_ADDON_CONFIG_DIR}}"
+
+  # Path to folder with base templates
+  local TEMPLATES="${SW_CATALOGS_REPO_DIR}/infra-configs/crossplane/providers/azure/templates/"
+
+  # Pipeline
+  folder2list \
+    "${TEMPLATES}" | \
+  patch_replace \
+    ".metadata.name" \
+    "${PROVIDERCONFIG_NAME}" \
+    "| select(.kind == \"ProviderConfig\") | select(.metadata.name == \"default\")" | \
+  patch_replace \
+    ".spec.credentials.secretRef.name" \
+    "${NEW_SECRET_NAME}" \
+    "| select(.kind == \"ProviderConfig\") | select(.metadata.name == \"default\")" | \
+  rename_file_in_items \
+    "crossplane-providerconfig-azure.yaml" \
+    "crossplane-providerconfig-azure-${PROVIDERCONFIG_NAME}.yaml" | \
+  generator_encrypted_secret_cloud_credentials \
+    "${CLOUD_CREDENTIALS}" \
+    "${NEW_SECRET_NAME}" \
+    "${PUBLIC_KEY}" | \
+  list2folder_cp_over \
+    "${TARGET_FOLDER}"
+}
+
+
+# Create ProviderConfig for GCP
+function add_providerconfig_for_gcp() {
+  # Inputs
+  local CLOUD_CREDENTIALS="$1"
+  local NEW_SECRET_NAME="$2"
+  local GCP_PROJECT="$3"
+  local PROVIDERCONFIG_NAME="${4:-default}"
+  local PUBLIC_KEY="${5:-${PUBLIC_KEY_MGMT}}"
+  local TARGET_FOLDER="${6:-${MGMT_ADDON_CONFIG_DIR}}"
+
+  # Path to folder with base templates
+  local TEMPLATES="${SW_CATALOGS_REPO_DIR}/infra-configs/crossplane/providers/gcp/templates/"
+
+  # Pipeline
+  folder2list \
+    "${TEMPLATES}" | \
+  patch_replace \
+    ".metadata.name" \
+    "${PROVIDERCONFIG_NAME}" \
+    "| select(.kind == \"ProviderConfig\") | select(.metadata.name == \"default\")" | \
+  patch_replace \
+    ".spec.credentials.secretRef.name" \
+    "${NEW_SECRET_NAME}" \
+    "| select(.kind == \"ProviderConfig\") | select(.metadata.name == \"default\")" | \
+  patch_replace \
+    ".spec.projectID" \
+    "${GCP_PROJECT}" \
+    "| select(.kind == \"ProviderConfig\") | select(.metadata.name == \"default\")" | \
+  rename_file_in_items \
+    "crossplane-providerconfig-gcp.yaml" \
+    "crossplane-providerconfig-gcp-${PROVIDERCONFIG_NAME}.yaml" | \
+  generator_encrypted_secret_cloud_credentials \
+    "${CLOUD_CREDENTIALS}" \
+    "${NEW_SECRET_NAME}" \
+    "${PUBLIC_KEY}" | \
+  list2folder_cp_over \
+    "${TARGET_FOLDER}"
+}
+
+
+# TODO: Deprecated
+# Create AKS cluster (without bootstrap)
+function create_cluster_aks() {
+  local CLUSTER_NAME="$1"
+  local VM_SIZE="$2"
+  local NODE_COUNT="$3"
+  local CLUSTER_LOCATION="$4"
+  local RG_NAME="$5"
+  local K8S_VERSION="${6:-"'1.28'"}"
+  local PROVIDERCONFIG_NAME="${7:-default}"
+  local CLUSTER_KUSTOMIZATION_NAME="${8:$(safe_name ${CLUSTER_NAME})}"
+  local TARGET_FOLDER="${9:-${MGMT_RESOURCES_DIR}}"
+  local MANIFEST_FILENAME="${10:-"${CLUSTER_NAME}.yaml"}"
+  local TEMPLATES="${11:-"${SW_CATALOGS_REPO_DIR}/cloud-resources/aks/templates/"}"
+  local TEMPLATE_MANIFEST_FILENAME="${12:-"aks01.yaml"}"
+
+  export CLUSTER_KUSTOMIZATION_NAME
+  folder2list \
+    "${TEMPLATES}" | \
+  replace_env_vars \
+    '${CLUSTER_KUSTOMIZATION_NAME}' | \
+  patch_replace \
+    ".spec.postBuild.substitute.cluster_name" \
+    "${CLUSTER_NAME}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  patch_replace \
+    ".spec.postBuild.substitute.cluster_name" \
+    "${CLUSTER_NAME}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  patch_replace \
+    ".spec.postBuild.substitute.vm_size" \
+    "${VM_SIZE}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  patch_replace \
+    ".spec.postBuild.substitute.node_count" \
+    "${NODE_COUNT}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  patch_replace \
+    ".spec.postBuild.substitute.cluster_location" \
+    "${CLUSTER_LOCATION}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  patch_replace \
+    ".spec.postBuild.substitute.rg_name" \
+    "${RG_NAME}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  patch_replace \
+    ".spec.postBuild.substitute.k8s_version" \
+    "${K8S_VERSION}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  patch_replace \
+    ".spec.postBuild.substitute.providerconfig_name" \
+    "${PROVIDERCONFIG_NAME}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  rename_file_in_items \
+    "${TEMPLATE_MANIFEST_FILENAME}" \
+    "${MANIFEST_FILENAME}" | \
+  prepend_folder_path "${CLUSTER_KUSTOMIZATION_NAME}/" | \
+  list2folder_cp_over \
+    "${TARGET_FOLDER}"
+}
+
+
+# Generator to create a profile folder
+function generator_profile_folder() {
+  local CONFIGMAP_NAME="$1"
+  local PROFILE_PATH="$2"
+  local PROFILE_TYPE="$3"
+  local REPO_URL="${4:-${FLEET_REPO_URL}}"
+  local PROFILE_LOCAL_DIR="${5:-"${PROFILE_PATH}"}"
+
+  join_lists \
+    <(cat) \
+    <(kubectl create configmap $(safe_name "${CONFIGMAP_NAME}") \
+        --namespace flux-system \
+        --from-literal=repo="${REPO_URL}" \
+        --from-literal=path="${PROFILE_PATH}" \
+        -o yaml \
+        --dry-run=client  | \
+      manifest2list | \
+      set_label \
+        "osm_profile_type" \
+        "${PROFILE_TYPE}" | \
+      set_filename_to_items "profile-configmap.yaml" | \
+      prepend_folder_path "${PROFILE_LOCAL_DIR}/")
+}
+
+
+# Helper function to return the relative path of a profile
+function path_to_profile() {
+  local PROFILE_NAME="$1"
+  local PROFILE_TYPE="$2"
+  local PROJECT_NAME="${3:-"${MGMT_PROJECT_NAME}"}"
+
+  case "${PROFILE_TYPE,,}" in
+
+    "controller" | "infra-controller" | "infra-controllers" | "infra_controller" | "infra_controllers")
+      echo -n "${PROJECT_NAME}/infra-controller-profiles/${PROFILE_NAME}"
+      return 0
+      ;;
+
+    "config" | "infra-config" | "infra-configs" | "infra_config" | "infra_configs")
+      echo -n "${PROJECT_NAME}/infra-config-profiles/${PROFILE_NAME}"
+      return 0
+      ;;
+
+    "managed" | "resources" | "managed-resources" | "managed_resources")
+      echo -n "${PROJECT_NAME}/managed-resources/${PROFILE_NAME}"
+      return 0
+      ;;
+
+     "app" |"apps" | "applications" | "cnf" | "cnfs" | "nf" | "nfs")
+      echo -n "${PROJECT_NAME}/app-profiles/${PROFILE_NAME}"
+      return 0
+      ;;
+
+    *)
+      echo -n "------------ ERROR ------------"
+      return 1
+      ;;
+  esac
+}
+
+
+# Function to create a new profile
+function create_profile() {
+  local PROFILE_NAME="$1"
+  local PROFILE_TYPE="$2"
+  local PROJECT_NAME="${3:-"${MGMT_PROJECT_NAME}"}"
+  local FLEET_REPO_URL="${4:-"${FLEET_REPO_URL}"}"
+  local FLEET_REPO_DIR="${5:-"${FLEET_REPO_DIR}"}"
+
+  local TARGET_PROFILE_PATH="$(
+    path_to_profile \
+      "${PROFILE_NAME}" \
+      "${PROFILE_TYPE}" \
+      "${PROJECT_NAME}" \
+  )"
+
+  # Generate profile as `ResourceList` and render to target folder.
+  echo "" | \
+  generator_profile_folder \
+    "${PROFILE_NAME}-${PROFILE_TYPE}" \
+    "${TARGET_PROFILE_PATH}" \
+    "${PROFILE_TYPE}" \
+    "${FLEET_REPO_URL}" \
+    "." | \
+  list2folder_cp_over \
+    "${FLEET_REPO_DIR}/${TARGET_PROFILE_PATH}"
+}
+
+
+# Function to delete a profile
+function delete_profile() {
+  local PROFILE_NAME="$1"
+  local PROFILE_TYPE="$2"
+  local PROJECT_NAME="${3:-"${MGMT_PROJECT_NAME}"}"
+  local FLEET_REPO_DIR="${4:-"${FLEET_REPO_DIR}"}"
+
+  local TARGET_PROFILE_PATH="$(
+    path_to_profile \
+      "${PROFILE_NAME}" \
+      "${PROFILE_TYPE}" \
+      "${PROJECT_NAME}" \
+  )"
+
+  # Delete the profile folder
+  rm -rf "${FLEET_REPO_DIR}/${TARGET_PROFILE_PATH}"
+}
+
+
+# ----- BEGIN of Helper functions for remote cluster bootstrap -----
+
+# Generate structure of profile folders prior to bootstrap
+function generator_profile_folders_new_cluster() {
+  # Inputs
+  local PROFILE_NAME="$1"
+  local FLEET_REPO_URL="$2"
+  local PROJECT_NAME="${3:-"${MGMT_PROJECT_NAME}"}"
+  # Optional inputs: Paths for each profile in the Git repo
+  local INFRA_CONTROLLERS_PATH="${4:-"${PROJECT_NAME}/infra-controller-profiles/${PROFILE_NAME}"}"
+  local INFRA_CONFIGS_PATH="${5:-"${PROJECT_NAME}/infra-config-profiles/${PROFILE_NAME}"}"
+  local MANAGED_RESOURCES_PATH="${6:-"${PROJECT_NAME}/managed-resources/${PROFILE_NAME}"}"
+  local APPS_PATH="${7:-"${PROJECT_NAME}/app-profiles/${PROFILE_NAME}"}"
+
+  # Generate profiles as `ResourceList`. merging with inputs
+  join_lists \
+    <(cat) \
+    <(
+      echo "" | \
+      generator_profile_folder \
+        "${PROFILE_NAME}-profile-infra-controllers" \
+        "${INFRA_CONTROLLERS_PATH}" \
+        "infra-controllers" \
+        "${FLEET_REPO_URL}" | \
+      generator_profile_folder \
+        "${PROFILE_NAME}-profile-infra-configs" \
+        "${INFRA_CONFIGS_PATH}" \
+        "infra-configs" \
+        "${FLEET_REPO_URL}" | \
+      generator_profile_folder \
+        "${PROFILE_NAME}-profile-managed-resources" \
+        "${MANAGED_RESOURCES_PATH}" \
+        "managed-resources" \
+        "${FLEET_REPO_URL}" | \
+      generator_profile_folder \
+        "${PROFILE_NAME}-profile-apps" \
+        "${APPS_PATH}" \
+        "apps" \
+        "${FLEET_REPO_URL}"
+      )
+}
+
+
+# Generate base Flux Kustomizations for the new cluster prior to bootstrap
+function generator_base_kustomizations_new_cluster() {
+  local CLUSTER_KUSTOMIZATION_NAME="$1"
+  local FLEET_REPO_URL="$2"
+  local SW_CATALOGS_REPO_URL="$3"
+  local PROJECT_NAME="${4:-"${MGMT_PROJECT_NAME}"}"
+  local SW_CATALOGS_REPO_DIR="${5:-"${SW_CATALOGS_REPO_DIR}"}"
+
+  # Optional inputs:
+  # Paths for each profile in the Git repo
+  local INFRA_CONTROLLERS_PATH="${6:-"${PROJECT_NAME}/infra-controller-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
+  local INFRA_CONFIGS_PATH="${7:-"${PROJECT_NAME}/infra-config-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
+  local MANAGED_RESOURCES_PATH="${8:-"${PROJECT_NAME}/managed-resources/${CLUSTER_KUSTOMIZATION_NAME}"}"
+  local APPS_PATH="${9:-"${PROJECT_NAME}/app-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
+
+  # Path for the source templates
+  local TEMPLATES="${SW_CATALOGS_REPO_DIR}/cloud-resources/flux-remote-bootstrap/cluster-base/templates"
+
+  # Generate
+  export CLUSTER_KUSTOMIZATION_NAME
+  export FLEET_REPO_URL
+  export SW_CATALOGS_REPO_URL
+  export INFRA_CONTROLLERS_PATH
+  export INFRA_CONFIGS_PATH
+  export MANAGED_RESOURCES_PATH
+  export APPS_PATH
+  join_lists \
+    <(cat) \
+    <(
+      folder2list \
+        "${TEMPLATES}" | \
+      replace_env_vars \
+        '${CLUSTER_KUSTOMIZATION_NAME},${FLEET_REPO_URL},${SW_CATALOGS_REPO_URL},${INFRA_CONTROLLERS_PATH},${INFRA_CONFIGS_PATH},${MANAGED_RESOURCES_PATH},${APPS_PATH}'
+    )
+}
+
+
+# Create SOPS configuration file for the root folder of the cluster
+function create_sops_configuration_file_new_cluster() {
+  local PUBLIC_KEY="$1"
+
+  MANIFEST="creation_rules:
+  - encrypted_regex: ^(data|stringData)$
+    age: ${PUBLIC_KEY}
+  # - path_regex: .*.yaml
+  #   encrypted_regex: ^(data|stringData)$
+  #   age: ${PUBLIC_KEY}"
+
+  # Generate SOPS configuration file for the root folder
+  echo "${MANIFEST}"
+}
+
+
+# Generate K8s secret for management cluster storing secret age key for the new cluster
+function generator_k8s_age_secret_new_cluster() {
+  local PRIVATE_KEY_NEW_CLUSTER="$1"
+  local PUBLIC_KEY_MGMT="$2"
+  local CLUSTER_AGE_SECRET_NAME="${3:-$(safe_name "sops-age-${CLUSTER_KUSTOMIZATION_NAME}")}"
+
+  join_lists \
+    <(cat) \
+    <(
+      echo "${PRIVATE_KEY_NEW_CLUSTER}" | \
+      grep -v '^#' | \
+      kubectl create secret generic "${CLUSTER_AGE_SECRET_NAME}" \
+        --namespace=managed-resources \
+        --from-file=agekey=/dev/stdin \
+        -o yaml --dry-run=client | \
+      encrypt_secret_from_stdin \
+        "${PUBLIC_KEY_MGMT}" |
+      manifest2list | \
+      set_filename_to_items "${CLUSTER_AGE_SECRET_NAME}.yaml"
+    )
+}
+
+
+# Generate bootstrap manifests for new cluster from the management cluster
+function generator_bootstrap_new_cluster() {
+  local CLUSTER_NAME="$1"
+  local CLUSTER_KUSTOMIZATION_NAME="${2:$(safe_name ${CLUSTER_NAME})}"
+  local CLUSTER_AGE_SECRET_NAME="${3:-$(safe_name "sops-age-${CLUSTER_KUSTOMIZATION_NAME}")}"
+  local SW_CATALOGS_REPO_DIR="${4:-"${SW_CATALOGS_REPO_DIR}"}"
+
+  # Paths and names for the templates
+  local MANIFEST_FILENAME="${5:-"cluster-bootstrap-${CLUSTER_KUSTOMIZATION_NAME}.yaml"}"
+  local TEMPLATES="${6:-"${SW_CATALOGS_REPO_DIR}/cloud-resources/flux-remote-bootstrap/bootstrap/templates"}"
+  local TEMPLATE_MANIFEST_FILENAME="${7:-"remote-cluster-bootstrap.yaml"}"
+
+  # Generate manifests
+  export CLUSTER_KUSTOMIZATION_NAME
+  export CLUSTER_NAME
+  export CLUSTER_AGE_SECRET_NAME
+
+  join_lists \
+    <(cat) \
+    <(
+      folder2list \
+        "${TEMPLATES}" | \
+      rename_file_in_items \
+        "${TEMPLATE_MANIFEST_FILENAME}" \
+        "${MANIFEST_FILENAME}" | \
+      replace_env_vars \
+        '${CLUSTER_KUSTOMIZATION_NAME},${CLUSTER_NAME},${CLUSTER_AGE_SECRET_NAME}'
+      )
+}
+
+
+# Auxiliary function to create kustomization manifests
+function manifest_kustomization() {
+  local KS_NAME="$1"
+  local KS_NS="$2"
+  local SOURCE_REPO="$3"
+  local MANIFESTS_PATH="$4"
+  local SOURCE_SYNC_INTERVAL="$5"
+  local HEALTH_CHECK_TO="$6"
+  local DEPENDS_ON="${7:-""}"
+  local OPTIONS="${8:-""}"
+
+  # Calculated inputs
+  local OPTION_FOR_DEPENDS_ON="$(
+    if [[ -z "${DEPENDS_ON}" ]];
+    then
+      echo ""
+    else
+      echo "--depends-on=${DEPENDS_ON}"
+    fi
+  )"
+  local OPTIONS="\
+    "${OPTIONS}" \
+    "${OPTION_FOR_DEPENDS_ON}" \
+  "
+
+  # Create Kustomization manifest
+  flux create kustomization "${KS_NAME}" \
+      --namespace="${KS_NS}" \
+      --source="${SOURCE_REPO}" \
+      --path="${MANIFESTS_PATH}" \
+      --interval="${SOURCE_SYNC_INTERVAL}" \
+      --health-check-timeout="${HEALTH_CHECK_TO}" \
+      ${OPTIONS} --export
+}
+
+
+# Helper function to generate a Kustomization
+function generator_kustomization() {
+  local MANIFEST_FILENAME="$1"
+  local ALL_PARAMS=( "${@}" )
+  local PARAMS=( "${ALL_PARAMS[@]:1}" )
+
+  # Use manifest creator to become a generator
+  make_generator \
+    "${MANIFEST_FILENAME}" \
+    manifest_kustomization \
+      "${PARAMS[@]}"
+}
+
+# ----- END of Helper functions for remote cluster bootstrap -----
+
+
+# Create bootstrap for remote cluster
+function create_bootstrap_for_remote_cluster() {
+  local CLUSTER_NAME="$1"
+  local CLUSTER_KUSTOMIZATION_NAME="$2"
+  local FLEET_REPO_DIR="${3:-"${FLEET_REPO_DIR}"}"
+  local SW_CATALOGS_REPO_DIR="${4:-"${SW_CATALOGS_REPO_DIR}"}"
+  local FLEET_REPO_URL="${5:-""}"
+  local SW_CATALOGS_REPO_URL="${6:-""}"
+  local MGMT_PROJECT_NAME="${7:-${MGMT_PROJECT_NAME}}"
+  local PUBLIC_KEY_MGMT="${8:-"${PUBLIC_KEY_MGMT}"}"
+  local PUBLIC_KEY_NEW_CLUSTER="$9"
+  local PRIVATE_KEY_NEW_CLUSTER="${10:-${PRIVATE_KEY_NEW_CLUSTER}}"
+  local IMPORTED_CLUSTER="${11:-"false"}"
+
+
+  # Calculates the folder where managed resources area defined
+  local MGMT_RESOURCES_DIR="${FLEET_REPO_DIR}/${MGMT_PROJECT_NAME}/managed-resources/_management"
+
+  # Create profile folders
+  echo "" | \
+  generator_profile_folders_new_cluster \
+    "${CLUSTER_KUSTOMIZATION_NAME}" \
+    "${FLEET_REPO_URL}" \
+    "${MGMT_PROJECT_NAME}" | \
+  list2folder_cp_over \
+    "${FLEET_REPO_DIR}"
+
+  # Create base Kustomizations for the new cluster
+  local CLUSTER_FOLDER="${FLEET_REPO_DIR}/clusters/${CLUSTER_KUSTOMIZATION_NAME}"
+  echo "" | \
+  generator_base_kustomizations_new_cluster \
+    "${CLUSTER_KUSTOMIZATION_NAME}" \
+    "${FLEET_REPO_URL}" \
+    "${SW_CATALOGS_REPO_URL}" \
+    "${MGMT_PROJECT_NAME}" \
+    "${SW_CATALOGS_REPO_DIR}" | \
+  list2folder_cp_over \
+    "${CLUSTER_FOLDER}"
+
+  # Add SOPS configuration at the root folder of the cluster
+  # NOTE: This file cannot be generated by pure KRM functions since it begins by a dot ('.')
+  create_sops_configuration_file_new_cluster \
+    "${PUBLIC_KEY_NEW_CLUSTER}" \
+  > "${CLUSTER_FOLDER}/.sops.yaml"
+
+  # Add also the public SOPS key to the repository so that others who clone the repo can encrypt new files
+  # NOTE: This file cannot be generated by pure KRM functions since it begins by a dot ('.')
+  echo "${PUBLIC_KEY_NEW_CLUSTER}" \
+  > "${CLUSTER_FOLDER}/.sops.pub.asc"
+
+  # Prepare everything to perform a Flux bootstrap of the new remote cluster from the management cluster.
+  # Here we also add the `age` private key to the **management cluster** as secret. This one will be used during bootstrap to inject the key into the new cluster
+  local CLUSTER_AGE_SECRET_NAME=$(safe_name "sops-age-${CLUSTER_KUSTOMIZATION_NAME}")
+  echo "" |
+  generator_bootstrap_new_cluster \
+    "${CLUSTER_NAME}" \
+    "${CLUSTER_KUSTOMIZATION_NAME}" \
+    "${CLUSTER_AGE_SECRET_NAME}" \
+    "${SW_CATALOGS_REPO_DIR}" | \
+  generator_k8s_age_secret_new_cluster \
+    "${PRIVATE_KEY_NEW_CLUSTER}" \
+    "${PUBLIC_KEY_MGMT}" \
+    "${CLUSTER_AGE_SECRET_NAME}" | \
+  prepend_folder_path "${CLUSTER_KUSTOMIZATION_NAME}/" | \
+  list2folder_cp_over \
+    "${MGMT_RESOURCES_DIR}"
+
+  # If it is an imported cluster, we must create a placeholder Kustomization
+  if [[ "${IMPORTED_CLUSTER,,}" == "true" ]];
+  then
+    TEMPLATES_DIR="${SW_CATALOGS_REPO_DIR}/cloud-resources/flux-remote-bootstrap/empty-kustomization/templates"
+
+    export CLUSTER_KUSTOMIZATION_NAME
+    folder2list \
+      "${TEMPLATES_DIR}" | \
+    replace_env_vars \
+      '${CLUSTER_KUSTOMIZATION_NAME}' | \
+    prepend_folder_path "${CLUSTER_KUSTOMIZATION_NAME}/" | \
+    list2folder_cp_over \
+      "${MGMT_RESOURCES_DIR}"
+    fi
+}
+
+
+# Disconnect Flux of remote cluster
+function disconnect_flux_remote_cluster() {
+  local CLUSTER_KUSTOMIZATION_NAME="$1"
+  local FLEET_REPO_DIR="${2:-"${FLEET_REPO_DIR}"}"
+  local MGMT_PROJECT_NAME="${3:-${MGMT_PROJECT_NAME}}"
+
+
+  # Calculates key folders
+  ## Base folder with Kustomizations for the new cluster
+  local CLUSTER_FOLDER="${FLEET_REPO_DIR}/clusters/${CLUSTER_KUSTOMIZATION_NAME}"
+  ## Folder where managed resources are defined in the management cluster
+  local MGMT_RESOURCES_CLUSTER_DIR="${FLEET_REPO_DIR}/${MGMT_PROJECT_NAME}/managed-resources/_management/${CLUSTER_KUSTOMIZATION_NAME}"
+
+  # Delete Flux resources syncronized directly from remote cluster
+  rm -rf "${CLUSTER_FOLDER}/flux-system"
+
+  # Delete Flux resources bootstraped remotely
+  rm -rf "${MGMT_RESOURCES_CLUSTER_DIR}/cluster-bootstrap-${CLUSTER_KUSTOMIZATION_NAME}.yaml"
+}
+
+
+# Create remote CrossPlane cluster (generic for any cloud)
+function create_crossplane_cluster() {
+  local CLUSTER_KUSTOMIZATION_NAME="$1"
+  local CLUSTER_NAME="$2"
+  # As of today, one among `aks`, `eks` or `gke`:
+  local CLUSTER_TYPE="$3"
+  local PROVIDERCONFIG_NAME="${4:-default}"
+  local VM_SIZE="$5"
+  local NODE_COUNT="$6"
+  local CLUSTER_LOCATION="$7"
+  local K8S_VERSION="${8:-"'1.28'"}"
+  local PUBLIC_KEY_MGMT="${9:-"${PUBLIC_KEY_MGMT}"}"
+  local PUBLIC_KEY_NEW_CLUSTER="${10}"
+  local PRIVATE_KEY_NEW_CLUSTER="${11:-"${PRIVATE_KEY_NEW_CLUSTER}"}"
+  # AKS only
+  local AKS_RG_NAME="${12:-""}"
+  # GKE only
+  local GKE_PREEMPTIBLE_NODES="${13:-""}"
+  ## `FLEET_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.fleet_mount_path}}/{{inputs.parameters.cloned_fleet_folder_name}}"
+  local FLEET_REPO_DIR="${14:-"${FLEET_REPO_DIR}"}"
+  local FLEET_REPO_URL="${15:-""}"
+  ## `SW_CATALOGS_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.sw_catalogs_mount_path}}/{{inputs.parameters.cloned_sw_catalogs_folder_name}}"
+  local SW_CATALOGS_REPO_DIR="${16:-"${SW_CATALOGS_REPO_DIR}"}"
+  local SW_CATALOGS_REPO_URL="${17:-""}"
+  # Perform bootstrap unless asked otherwise
+  local SKIP_BOOTSTRAP="${18:"false"}"
+  # Only change if absolutely needeed
+  local MGMT_PROJECT_NAME="${19:-"osm_admin"}"
+  local MGMT_CLUSTER_NAME="${20:-"_management"}"
+  local BASE_TEMPLATES_PATH="${21:-"cloud-resources"}"
+  local TEMPLATE_MANIFEST_FILENAME="${22:-"${CLUSTER_TYPE,,}01.yaml"}"
+  local MANIFEST_FILENAME="${23:-"${CLUSTER_TYPE,,}-${CLUSTER_NAME}.yaml"}"
+
+
+  # Is the provider type supported?
+  local VALID_PROVIDERS=("eks" "aks" "gke")
+  CLUSTER_TYPE="${CLUSTER_TYPE,,}"
+  [[ ! ($(echo ${VALID_PROVIDERS[@]} | grep -w "${CLUSTER_TYPE}")) ]] && return 1
+
+  # Determines the source dir for the templates and the target folder in Fleet
+  local TEMPLATES_DIR="${SW_CATALOGS_REPO_DIR}/${BASE_TEMPLATES_PATH}/${CLUSTER_TYPE}/templates"
+  local TARGET_FOLDER="${FLEET_REPO_DIR}/${MGMT_PROJECT_NAME}/managed-resources/${MGMT_CLUSTER_NAME}"
+
+  # Determine which optional steps may be needed
+  local IS_AKS=$([[ "${CLUSTER_TYPE}" == "aks" ]]; echo $?)
+  local IS_GCP=$([[ "${CLUSTER_TYPE}" == "gcp" ]]; echo $?)
+
+  # Pipeline of transformations to create the cluster resource
+  export CLUSTER_KUSTOMIZATION_NAME
+  folder2list \
+    "${TEMPLATES_DIR}" | \
+  replace_env_vars \
+    '${CLUSTER_KUSTOMIZATION_NAME}' | \
+  patch_replace \
+    ".spec.postBuild.substitute.cluster_name" \
+    "${CLUSTER_NAME}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  patch_replace \
+    ".spec.postBuild.substitute.vm_size" \
+    "${VM_SIZE}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  patch_replace \
+    ".spec.postBuild.substitute.node_count" \
+    "${NODE_COUNT}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  patch_replace \
+    ".spec.postBuild.substitute.cluster_location" \
+    "${CLUSTER_LOCATION}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  patch_replace \
+    ".spec.postBuild.substitute.k8s_version" \
+    "${K8S_VERSION}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  patch_replace \
+    ".spec.postBuild.substitute.providerconfig_name" \
+    "${PROVIDERCONFIG_NAME}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  transform_if \
+    "${IS_AKS}" \
+    patch_replace \
+      ".spec.postBuild.substitute.rg_name" \
+      "${AKS_RG_NAME}" \
+      "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  transform_if \
+    "${IS_GKE}" \
+    patch_replace \
+      ".spec.postBuild.substitute.preemptible_nodes" \
+      "${GKE_PREEMPTIBLE_NODES}" \
+      "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
+  rename_file_in_items \
+    "${TEMPLATE_MANIFEST_FILENAME}" \
+    "${MANIFEST_FILENAME}" | \
+  prepend_folder_path "${CLUSTER_KUSTOMIZATION_NAME}/" | \
+  list2folder_cp_over \
+    "${TARGET_FOLDER}"
+
+  # Bootstrap (unless asked to skip)
+  if [[ "${SKIP_BOOTSTRAP,,}" == "true" ]]; then
+    return 0
+  fi
+  create_bootstrap_for_remote_cluster \
+    "${CLUSTER_NAME}" \
+    "${CLUSTER_KUSTOMIZATION_NAME}" \
+    "${FLEET_REPO_DIR}" \
+    "${SW_CATALOGS_REPO_DIR}" \
+    "${FLEET_REPO_URL}" \
+    "${SW_CATALOGS_REPO_URL}" \
+    "${MGMT_PROJECT_NAME}" \
+    "${PUBLIC_KEY_MGMT}" \
+    "${PUBLIC_KEY_NEW_CLUSTER}" \
+    "${PRIVATE_KEY_NEW_CLUSTER}"
+}
+
+
+# Delete remote cluster (generic for any cloud)
+function delete_remote_cluster() {
+  local CLUSTER_KUSTOMIZATION_NAME="$1"
+  local PROJECT_NAME="${2:-"${MGMT_PROJECT_NAME}"}"
+  local FLEET_REPO_DIR="${3:-"${FLEET_REPO_DIR}"}"
+  local MGMT_RESOURCES_DIR="${4:-"${MGMT_RESOURCES_DIR}"}"
+
+  # Optional inputs: Paths for each profile in the Git repo
+  local INFRA_CONTROLLERS_DIR="${5:-"${FLEET_REPO_DIR}/${PROJECT_NAME}/infra-controller-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
+  local INFRA_CONFIGS_DIR="${6:-"${FLEET_REPO_DIR}/${PROJECT_NAME}/infra-config-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
+  local MANAGED_RESOURCES_DIR="${7:-"${FLEET_REPO_DIR}/${PROJECT_NAME}/managed-resources/${CLUSTER_KUSTOMIZATION_NAME}"}"
+  local APPS_DIR="${8:-"${FLEET_REPO_DIR}/${PROJECT_NAME}/app-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
+  local CLUSTER_DIR="${9:-"${FLEET_REPO_DIR}/clusters/${CLUSTER_KUSTOMIZATION_NAME}"}"
+
+  # Delete profile folders
+  rm -rf "${INFRA_CONTROLLERS_DIR}"
+  rm -rf "${INFRA_CONFIGS_DIR}"
+  rm -rf "${MANAGED_RESOURCES_DIR}"
+  rm -rf "${APPS_DIR}"
+
+  # Delete base cluster Kustomizations
+  rm -rf "${CLUSTER_DIR}"
+
+  # Delete cluster resources
+  rm -rf "${MGMT_RESOURCES_DIR}/${CLUSTER_KUSTOMIZATION_NAME}"
+}
+
+
+# Update remote CrossPlane cluster (generic for any cloud)
+function update_crossplane_cluster() {
+  local CLUSTER_KUSTOMIZATION_NAME="$1"
+  local CLUSTER_NAME="$2"
+  # As of today, one among `aks`, `eks` or `gke`:
+  local CLUSTER_TYPE="$3"
+  local PROVIDERCONFIG_NAME="${4:-default}"
+  local VM_SIZE="$5"
+  local NODE_COUNT="$6"
+  local CLUSTER_LOCATION="$7"
+  local K8S_VERSION="${8:-"'1.28'"}"
+  local PUBLIC_KEY_MGMT="${9:-"${PUBLIC_KEY_MGMT}"}"
+  local PUBLIC_KEY_NEW_CLUSTER="${10}"
+  local PRIVATE_KEY_NEW_CLUSTER="${11:-"${PRIVATE_KEY_NEW_CLUSTER}"}"
+  # AKS only
+  local AKS_RG_NAME="${12:-""}"
+  # GKE only
+  local GKE_PREEMPTIBLE_NODES="${13:-""}"
+  ## `FLEET_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.fleet_mount_path}}/{{inputs.parameters.cloned_fleet_folder_name}}"
+  local FLEET_REPO_DIR="${14:-"${FLEET_REPO_DIR}"}"
+  local FLEET_REPO_URL="${15:-""}"
+  ## `SW_CATALOGS_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.sw_catalogs_mount_path}}/{{inputs.parameters.cloned_sw_catalogs_folder_name}}"
+  local SW_CATALOGS_REPO_DIR="${16:-"${SW_CATALOGS_REPO_DIR}"}"
+  local SW_CATALOGS_REPO_URL="${17:-""}"
+  # Prevent a new bootstrap by default
+  local SKIP_BOOTSTRAP="${18:"true"}"
+  # Only change if absolutely needeed
+  local MGMT_PROJECT_NAME="${19:-"osm_admin"}"
+  local MGMT_CLUSTER_NAME="${20:-"_management"}"
+  local BASE_TEMPLATES_PATH="${21:-"cloud-resources"}"
+  local TEMPLATE_MANIFEST_FILENAME="${22:-"${CLUSTER_TYPE,,}01.yaml"}"
+  local MANIFEST_FILENAME="${23:-"${CLUSTER_TYPE,,}-${CLUSTER_NAME}.yaml"}"
+
+
+  # Is the provider type supported?
+  local VALID_PROVIDERS=("eks" "aks" "gke")
+  CLUSTER_TYPE="${CLUSTER_TYPE,,}"
+  [[ ! ($(echo ${VALID_PROVIDERS[@]} | grep -w "${CLUSTER_TYPE}")) ]] && return 1
+
+  # Determine key folders in Fleet
+  local MGMT_RESOURCES_DIR="${FLEET_REPO_DIR}/${MGMT_PROJECT_NAME}/managed-resources/${MGMT_CLUSTER_NAME}"
+
+  # First, delete cluster's CrossPlane resources
+  # NOTE: We only delete de Kustomization referring to CrossPlane resources,
+  # not the bootstrap resources or the profiles. Thus we avoid that KSUs are
+  # affected or a potential second unnecesary bootstrap.
+  rm -rf "${MGMT_RESOURCES_DIR}/${CLUSTER_KUSTOMIZATION_NAME}/${MANIFEST_FILENAME}"
+
+  # Then, recreate the manifests with updated values
+  create_crossplane_cluster \
+    "${CLUSTER_KUSTOMIZATION_NAME}" \
+    "${CLUSTER_NAME}" \
+    "${CLUSTER_TYPE}" \
+    "${PROVIDERCONFIG_NAME}" \
+    "${VM_SIZE}" \
+    "${NODE_COUNT}" \
+    "${CLUSTER_LOCATION}" \
+    "${K8S_VERSION}" \
+    "${PUBLIC_KEY_MGMT}" \
+    "${PUBLIC_KEY_NEW_CLUSTER}" \
+    "${PRIVATE_KEY_NEW_CLUSTER}" \
+    "${AKS_RG_NAME}" \
+    "${GKE_PREEMPTIBLE_NODES}" \
+    "${FLEET_REPO_DIR}" \
+    "${FLEET_REPO_URL}" \
+    "${SW_CATALOGS_REPO_DIR}" \
+    "${SW_CATALOGS_REPO_URL}" \
+    "${SKIP_BOOTSTRAP}" \
+    "${MGMT_PROJECT_NAME}" \
+    "${MGMT_CLUSTER_NAME}" \
+    "${BASE_TEMPLATES_PATH}" \
+    "${TEMPLATE_MANIFEST_FILENAME}" \
+    "${MANIFEST_FILENAME}"
+}
+
+
+# ----- Helper functions for adding/removing a profile from a cluster -----
+
+# Helper function to find profiles of a given type already used in the cluster
+function profiles_of_type_in_cluster() {
+  local CLUSTER_KUSTOMIZATION_NAME="$1"
+  local RELEVANT_PROFILE_TYPE="$2"
+  local FLEET_REPO_DIR="${3:-"${FLEET_REPO_DIR}"}"
+
+  # Calculated fields
+  local CLUSTER_FOLDER="${FLEET_REPO_DIR}/clusters/${CLUSTER_KUSTOMIZATION_NAME}"
+
+  # Processing (echoes the list)
+  folder2list \
+    "${CLUSTER_FOLDER}" | \
+  get_value_from_resourcelist \
+    ".metadata.name" \
+    "| select(.kind == \"Kustomization\")
+    | select(.metadata.labels.osm_profile_type == \"${RELEVANT_PROFILE_TYPE}\")" | \
+  multiline2commalist
+}
+
+
+# Function to list the profiles **this profile depends on**
+function profiles_this_one_depends_on() {
+  local CLUSTER_KUSTOMIZATION_NAME="$1"
+  local PROFILE_TYPE="$2"
+  local FLEET_REPO_DIR="${3:-"${FLEET_REPO_DIR}"}"
+
+  case "${PROFILE_TYPE,,}" in
+
+    "controller" | "infra-controller" | "infra-controllers" | "infra_controller" | "infra_controllers")
+      # Controllers do not depend on any other type of profiles
+      echo ""
+      return 0
+      ;;
+
+    "config" | "infra-config" | "infra-configs" | "infra_config" | "infra_configs")
+      # Infra configs depend on controllers
+      profiles_of_type_in_cluster \
+        "${CLUSTER_KUSTOMIZATION_NAME}" \
+        "infra-controllers" \
+        "${FLEET_REPO_DIR}"
+      return 0
+      ;;
+
+    "managed" | "resources" | "managed-resources" | "managed_resources")
+      # Managed resources depend on infra configs
+      profiles_of_type_in_cluster \
+        "${CLUSTER_KUSTOMIZATION_NAME}" \
+        "infra-configs" \
+        "${FLEET_REPO_DIR}"
+      return 0
+      ;;
+
+     "app" |"apps" | "applications" | "cnf" | "cnfs" | "nf" | "nfs")
+      # Apps (also) depend on infra configs
+      profiles_of_type_in_cluster \
+        "${CLUSTER_KUSTOMIZATION_NAME}" \
+        "infra-configs" \
+        "${FLEET_REPO_DIR}"
+      return 0
+      ;;
+
+    *)
+      echo -n "------------ ERROR ------------"
+      return 1
+      ;;
+  esac
+}
+
+
+# Function to list the profiles that **depend on this profile**
+function profiles_depend_on_this_one() {
+  local CLUSTER_KUSTOMIZATION_NAME="$1"
+  local PROFILE_TYPE="$2"
+  local FLEET_REPO_DIR="${3:-"${FLEET_REPO_DIR}"}"
+
+  case "${PROFILE_TYPE,,}" in
+
+    "controller" | "infra-controller" | "infra-controllers" | "infra_controller" | "infra_controllers")
+      # Infra configs depend on infra controllers
+      profiles_of_type_in_cluster \
+        "${CLUSTER_KUSTOMIZATION_NAME}" \
+        "infra-configs" \
+        "${FLEET_REPO_DIR}"
+      return 0
+      ;;
+
+    "config" | "infra-config" | "infra-configs" | "infra_config" | "infra_configs")
+      # Both managed resources and apps depend on configs
+      local PROFILES=(
+        $(
+          profiles_of_type_in_cluster \
+            "${CLUSTER_KUSTOMIZATION_NAME}" \
+            "managed-resources" \
+            "${FLEET_REPO_DIR}"
+        ) \
+        $(
+        profiles_of_type_in_cluster \
+          "${CLUSTER_KUSTOMIZATION_NAME}" \
+          "apps" \
+          "${FLEET_REPO_DIR}"
+        )
+      )
+      printf '%s,' "${PROFILES[@]}" | sed 's/,$//g'
+      return 0
+      ;;
+
+    "managed" | "resources" | "managed-resources" | "managed_resources")
+      # No other profiles depend on managed resources
+      echo ""
+      return 0
+      ;;
+
+     "app" |"apps" | "applications" | "cnf" | "cnfs" | "nf" | "nfs")
+      # No other profiles depend on apps
+      echo ""
+      return 0
+      ;;
+
+    *)
+      echo -n "------------ ERROR ------------"
+      return 1
+      ;;
+  esac
+}
+
+
+# Helper function to add a dependency to a Kustomization only if it does not exist already
+function add_dependency_to_kustomization_safely() {
+  local KUSTOMIZATION_NAME="$1"
+  local KUSTOMIZATION_TO_ADD_AS_DEP="$2"
+
+  local INPUT=$(cat)
+  local FILTER="| select(.kind == \"Kustomization\") | select(.metadata.name == \"${KUSTOMIZATION_NAME}\")"
+
+  # Check if the dependency was added already
+  local TEST_RESULT=$(
+    echo "${INPUT}" | \
+    is_element_on_list \
+      ".spec.dependsOn[].name" \
+      "${KUSTOMIZATION_TO_ADD_AS_DEP}" \
+      "${FILTER}"
+  )
+
+  # If it existed already, returns the stream as is
+  if [[ "${TEST_RESULT}" == "true" ]]
+  then
+    echo "${INPUT}"
+  # Otherwise, processes the stream to add it
+  else
+    echo "${INPUT}" | \
+    patch_add_to_list \
+      ".spec.dependsOn" \
+      "{name: ${KUSTOMIZATION_TO_ADD_AS_DEP}}" \
+      "${FILTER}"
+  fi
+}
+
+
+# Helper function to remove a dependency from a Kustomization
+function remove_dependency_from_kustomization_safely() {
+  local KUSTOMIZATION_NAME="$1"
+  local KUSTOMIZATION_TO_REMOVE_AS_DEP="$2"
+
+  # Calculated inputs
+  local KEY_PATH=".spec.dependsOn[] | select(.name == \"${KUSTOMIZATION_TO_REMOVE_AS_DEP}\")"
+  local FILTER="| select(.kind == \"Kustomization\") | select(.metadata.name == \"${KUSTOMIZATION_NAME}\")"
+
+  # Remove the entry from the dependency list (if it exists)
+  yq "del((.items[]${FILTER})${KEY_PATH})"
+}
+
+
+# Ensure list of Kustomizations depend on a given Kustomization
+function add_dependency_to_set_of_kustomizations_safely() {
+  local KS_NAME="$1"
+  local THEY_DEPEND_ON_THIS="$2"
+
+  local INPUT="$(cat)"
+  local OUTPUT=""
+
+  # For each of the Kustomizations on the comma-separated list, adds `KS_NAME` as one of their dependencies
+  for KUST in ${THEY_DEPEND_ON_THIS//,/ }
+  do
+    local OUTPUT="$(
+      echo "${INPUT}" | \
+      add_dependency_to_kustomization_safely \
+        "${KUST}" \
+        "${KS_NAME}"
+    )"
+    local INPUT="${OUTPUT}"
+  done
+
+  # Return the final `ResultList`, after all iterations
+  echo "${OUTPUT}"
+}
+
+
+# Ensure list of Kustomizations no longer depend on a given Kustomization
+function remove_dependency_from_set_of_kustomizations_safely() {
+  local KS_NAME="$1"
+  local THEY_NO_LONGER_DEPEND_ON_THIS="$2"
+
+  local INPUT="$(cat)"
+  local OUTPUT=""
+
+  # For each of the Kustomizations on the comma-separated list, removes `KS_NAME` from their dependencies
+  for KUST in ${THEY_NO_LONGER_DEPEND_ON_THIS//,/ }
+  do
+    local OUTPUT="$(
+      echo "${INPUT}" | \
+      remove_dependency_from_kustomization_safely \
+        "${KUST}" \
+        "${KS_NAME}"
+    )"
+    local INPUT="${OUTPUT}"
+  done
+
+  # Return the final `ResultList`, after all iterations
+  echo "${OUTPUT}"
+}
+
+# ----- END of Helper functions for adding/removing a profile from a cluster -----
+
+
+# Add an existing profile to a cluster
+function attach_profile_to_cluster() {
+  local PROFILE_NAME="$1"
+  local PROFILE_TYPE="$2"
+  local PROJECT_NAME="$3"
+  local CLUSTER_KUSTOMIZATION_NAME="$4"
+  local FLEET_REPO_DIR="${5:-"${FLEET_REPO_DIR}"}"
+
+  # Calculated inputs
+  local CLUSTER_FOLDER="${FLEET_REPO_DIR}/clusters/${CLUSTER_KUSTOMIZATION_NAME}"
+  local TARGET_PROFILE_PATH="$(
+      path_to_profile \
+        "${PROFILE_NAME}" \
+        "${PROFILE_TYPE}" \
+        "${PROJECT_NAME}"
+  )"
+
+  # Finds out which profiles it should depend on... and which profiles should depend on it
+  local DEPENDS_ON=$(
+    profiles_this_one_depends_on \
+      "${CLUSTER_KUSTOMIZATION_NAME}" \
+      "${PROFILE_TYPE}" \
+      "${FLEET_REPO_DIR}"
+  )
+
+  local THEY_DEPEND_ON_THIS=$(
+    profiles_depend_on_this_one \
+      "${CLUSTER_KUSTOMIZATION_NAME}" \
+      "${PROFILE_TYPE}" \
+      "${FLEET_REPO_DIR}"
+  )
+
+  # Parameters for the new Kustomization object to point to the profile
+  local KS_NAME="$(safe_name "${PROFILE_TYPE}-${PROFILE_NAME}")"
+  local MANIFEST_FILENAME="${KS_NAME}.yaml"
+  local KS_NS=flux-system
+  local MANIFESTS_PATH="${TARGET_PROFILE_PATH}"
+  local SOURCE_REPO=GitRepository/fleet-repo.flux-system
+  local SOURCE_SYNC_INTERVAL="60m"
+  local HEALTH_CHECK_TO="3m"
+  local RETRY_INTERVAL="1m"
+  local TIMEOUT="5m"
+  local OPTIONS="\
+    --decryption-provider=sops \
+    --decryption-secret=sops-age \
+    --prune=true \
+    --timeout="${TIMEOUT}" \
+    --retry-interval="${RETRY_INTERVAL}" \
+    --label osm_profile_type="${PROFILE_TYPE}"
+  "
+
+  # Finally, we update the folder with all the required changes:
+  # - Update pre-existing Kustomizations that should depend on the new profile (besides others).
+  # - Create a new Kustomization pointing to the profile.
+  # - Update Kustomize's `kustomization.yaml` at the root of the cluster folder to take into account the new Kustomization pointing to the profile.
+  # - Update the cluster folder accordingly.
+  folder2list \
+    "${CLUSTER_FOLDER}" |
+  add_dependency_to_set_of_kustomizations_safely \
+    "${KS_NAME}" \
+    "${THEY_DEPEND_ON_THIS}" | \
+  generator_kustomization \
+    "${MANIFEST_FILENAME}" \
+    "${KS_NAME}" \
+    "${KS_NS}" \
+    "${SOURCE_REPO}" \
+    "${MANIFESTS_PATH}" \
+    "${SOURCE_SYNC_INTERVAL}" \
+    "${HEALTH_CHECK_TO}" \
+    "${DEPENDS_ON}" \
+    "${OPTIONS}" | \
+  patch_add_to_list \
+    ".resources" \
+    "${MANIFEST_FILENAME}" \
+    "| select(.kind == \"Kustomization\") | select(.apiVersion == \"kustomize.config.k8s.io/v1beta1\") | select(.metadata.annotations.\"config.kubernetes.io/path\" == \"kustomization.yaml\")" | \
+  list2folder_sync_replace \
+    "${CLUSTER_FOLDER}"
+}
+
+
+# Remove an existing profile from a cluster
+function detach_profile_from_cluster() {
+  local PROFILE_NAME="$1"
+  local PROFILE_TYPE="$2"
+  local PROJECT_NAME="$3"
+  local CLUSTER_KUSTOMIZATION_NAME="$4"
+  local FLEET_REPO_DIR="${5:-"${FLEET_REPO_DIR}"}"
+
+  # Calculated inputs
+  local CLUSTER_FOLDER="${FLEET_REPO_DIR}/clusters/${CLUSTER_KUSTOMIZATION_NAME}"
+  local TARGET_PROFILE_PATH="$(
+      path_to_profile \
+        "${PROFILE_NAME}" \
+        "${PROFILE_TYPE}" \
+        "${PROJECT_NAME}"
+  )"
+
+  # Finds out which profiles still depend on it
+  local THEY_DEPEND_ON_THIS=$(
+    profiles_depend_on_this_one \
+      "${CLUSTER_KUSTOMIZATION_NAME}" \
+      "${PROFILE_TYPE}" \
+      "${FLEET_REPO_DIR}"
+  )
+
+  # Parameters for the new Kustomization object to point to the profile
+  local KS_NAME="$(safe_name "${PROFILE_TYPE}-${PROFILE_NAME}")"
+
+  # Finally, we update the folder with all the required changes:
+  # - Update pre-existing Kustomizations that should depend on the new profile (besides others).
+  # - Create a new Kustomization pointing to the profile.
+  # - Update Kustomize's `kustomization.yaml` at the root of the cluster folder so that it no longer tries to gather the Kustomization pointing to the profile.
+  # - Update the cluster folder accordingly.
+  folder2list \
+    "${CLUSTER_FOLDER}" |
+  remove_dependency_from_set_of_kustomizations_safely \
+    "${KS_NAME}" \
+    "${THEY_DEPEND_ON_THIS}" | \
+  delete_object \
+    "${KS_NAME}" \
+    "Kustomization" \
+    "kustomize.toolkit.fluxcd.io/v1" | \
+  patch_delete_from_list \
+    ".resources[] | select(. == \"${MANIFEST_FILENAME}\") " \
+    "| select(.kind == \"Kustomization\") | select(.apiVersion == \"kustomize.config.k8s.io/v1beta1\") | select(.metadata.annotations.\"config.kubernetes.io/path\" == \"kustomization.yaml\")" | \
+  list2folder_sync_replace \
+    "${CLUSTER_FOLDER}"
+}
+
+
+# Low-level function to add a KSU into a profile
+function create_ksu_into_profile() {
+  local KSU_NAME="$1"
+  local TARGET_PROFILE_FOLDER="$2"
+  local TEMPLATES_PATH="$3"
+  local SW_CATALOGS_REPO_DIR="$4"
+  local TRANSFORMER="${5:-noop_transformer}"
+
+  # Gathers all optional parameters for transformer funcion (if any) and puts them into an array for further use
+  local ALL_PARAMS=( "${@}" )
+  local TRANSFORMER_ARGS=( "${ALL_PARAMS[@]:5}" )
+
+  # Composes the route to the local templates folder
+  local TEMPLATES_FOLDER="${SW_CATALOGS_REPO_DIR}/${TEMPLATES_PATH}"
+
+  folder2list \
+    "${TEMPLATES_FOLDER}" | \
+  "${TRANSFORMER}" \
+    "${TRANSFORMER_ARGS[@]}" | \
+  prepend_folder_path "${KSU_NAME}/" | \
+  list2folder_cp_over \
+    "${TARGET_PROFILE_FOLDER}"
+}
+
+
+# Function to render a KSU from a `ResourceList` into a profile
+function render_ksu_into_profile() {
+  local KSU_NAME="$1"
+  local PROFILE_NAME="$2"
+  local PROFILE_TYPE="$3"
+  local PROJECT_NAME="${4:-"${MGMT_PROJECT_NAME}"}"
+  local FLEET_REPO_DIR="$5"
+  local SYNC="${6:-"false"}"
+
+  local TARGET_PROFILE_PATH=$(
+    path_to_profile \
+      "${PROFILE_NAME}" \
+      "${PROFILE_TYPE}" \
+      "${PROJECT_NAME}"
+  )
+
+  local TARGET_PROFILE_FOLDER="${FLEET_REPO_DIR}/${TARGET_PROFILE_PATH}"
+
+  # Determines the appropriate function depending on rendering strategy
+  # - Sync (and potentially delete files in target folder)
+  # - Copy over (only overwrite changed files, keep the rest)
+  RENDERER=""
+  if [[ ${SYNC,,} == "true" ]];
+  then
+    RENDERER="list2folder_sync_replace"
+  else
+    RENDERER="list2folder_cp_over"
+  fi
+
+  # Render with the selected strategy
+  [[ "${DRY_RUN,,}" != "true" ]] && mkdir -p "${TARGET_PROFILE_FOLDER}/${KSU_NAME}"
+  "${RENDERER}" \
+    "${TARGET_PROFILE_FOLDER}/${KSU_NAME}"
+  ## This is improves the behaviour of the following code,
+  ## since avoids unintented deletions in parent folder due to sync
+  # prepend_folder_path "${KSU_NAME}/" | \
+  # "${RENDERER}" \
+  #   "${TARGET_PROFILE_FOLDER}"
+}
+
+
+# High-level function to add a KSU into a profile for the case where
+# 1. It is originated from an OKA, and
+# 2. It is based on a HelmRelease.
+function create_hr_ksu_into_profile() {
+  # Base KSU generation from template
+  ## `TEMPLATES_DIR` is the result of:
+  ## "{{inputs.parameters.sw_catalogs_mount_path}}/{{inputs.parameters.cloned_sw_catalogs_folder_name}}/{{inputs.parameters.templates_path}}"
+  local TEMPLATES_DIR="$1"
+  local SUBSTITUTE_ENVIRONMENT="${2:-"false"}"
+  local SUBSTITUTION_FILTER="${3:-""}"
+  local CUSTOM_ENV_VARS="${4:-""}"
+  # Patch HelmRelease in KSU with inline values
+  local KUSTOMIZATION_NAME="$5"
+  local HELMRELEASE_NAME="$6"
+  local INLINE_VALUES="${7:-""}"
+  # Secret reference and generation (if required)
+  local IS_PREEXISTING_SECRET="${8:-"false"}"
+  local TARGET_NS="$9"
+  local VALUES_SECRET_NAME="${10}"
+  local SECRET_KEY="${11:-"values.yaml"}"
+  local AGE_PUBLIC_KEY="${12}"
+  ## `SECRET_VALUES` will be obtained from the
+  ## secret named after the input parameter `reference_secret_for_values`,
+  ## and from the key named after the input parameter `reference_key_for_values`
+  local LOCAL_SECRET_VALUES="${13:-"${SECRET_VALUES}"}"
+  # ConfigMap reference and generation (if required)
+  local IS_PREEXISTING_CM="${14:-"false"}"
+  local VALUES_CM_NAME="${15:-""}"
+  local CM_KEY="${16:-""}"
+  local CM_VALUES="${17:-""}"
+  # KSU rendering
+  local KSU_NAME="${18}"
+  local PROFILE_NAME="${19}"
+  local PROFILE_TYPE="${20}"
+  local PROJECT_NAME="${21:-"osm_admin"}"
+  ## `FLEET_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.fleet_mount_path}}/{{inputs.parameters.cloned_fleet_folder_name}}"
+  local FLEET_REPO_DIR="${22:-"/fleet/fleet-osm/"}"
+  local SYNC="${23:-"true"}"
+
+  # Decides which steps may be skipped
+  HAS_INLINE_VALUES=$([[ -n "${INLINE_VALUES}" ]]; echo $?)
+  HAS_REFERENCES=$([[ ( -n "${VALUES_SECRET_NAME}" ) || ( -n "${VALUES_CM_NAME}" ) ]]; echo $?)
+  NEEDS_NEW_SECRET=$([[ ( -n "${VALUES_SECRET_NAME}" ) && ( "${IS_PREEXISTING_SECRET,,}" == "false" ) ]]; echo $?)
+  NEEDS_NEW_CM=$([[ ( -n "${VALUES_CM_NAME}" ) && ( "${IS_PREEXISTING_CM,,}" == "false" ) ]]; echo $?)
+  ECHO_RESOURCELIST=$([[ "${DEBUG,,}" == "true" ]]; echo $?)
+
+  # If applicable, loads additional environment variables
+  if [[ -n "${CUSTOM_ENV_VARS}" ]];
+  then
+      set -a
+      source <(echo "${CUSTOM_ENV_VARS}")
+      set +a
+  fi
+
+  # Runs workflow
+  folder2list_generator \
+    "${TEMPLATES_DIR}" \
+    "${SUBSTITUTE_ENVIRONMENT}" \
+    "${SUBSTITUTION_FILTER}" | \
+  transform_if \
+    "${HAS_INLINE_VALUES}" \
+    add_values_to_helmrelease_via_ks \
+      "${KUSTOMIZATION_NAME}" \
+      "${HELMRELEASE_NAME}" \
+      "${INLINE_VALUES}" | \
+  transform_if \
+    "${HAS_REFERENCES}" \
+    add_ref_values_to_hr_via_ks \
+      "${KUSTOMIZATION_NAME}" \
+      "${HELMRELEASE_NAME}" \
+      "${VALUES_SECRET_NAME}" \
+      "${VALUES_CM_NAME}" | \
+  transform_if \
+    "${NEEDS_NEW_SECRET}" \
+    make_generator \
+      "hr-values-secret.yaml" \
+      kubectl_encrypt \
+        "${AGE_PUBLIC_KEY}" \
+        create \
+        secret \
+        generic \
+        "${VALUES_SECRET_NAME}" \
+        --namespace="${TARGET_NS}" \
+        --from-file="${SECRET_KEY}"=<(echo "${LOCAL_SECRET_VALUES}") \
+        -o=yaml \
+        --dry-run=client | \
+  transform_if \
+    "${NEEDS_NEW_CM}" \
+    make_generator \
+      "hr-values-configmap.yaml" \
+      kubectl \
+      create \
+      configmap \
+      "${VALUES_CM_NAME}" \
+      --namespace="${TARGET_NS}" \
+      --from-file="${SECRET_KEY}"=<(echo "${CM_VALUES}") \
+      -o=yaml \
+      --dry-run=client | \
+  transform_if \
+    "${ECHO_RESOURCELIST}" \
+    tee /dev/stderr | \
+  render_ksu_into_profile \
+    "${KSU_NAME}" \
+    "${PROFILE_NAME}" \
+    "${PROFILE_TYPE}" \
+    "${PROJECT_NAME}" \
+    "${FLEET_REPO_DIR}" \
+    "${SYNC}"
+}
+
+
+# High-level function to update a KSU for the case where
+# 1. It is originated from an OKA, and
+# 2. It is based on a HelmRelease.
+# NOTE: It is an alias of `create_hr_ksu_into_profile`, setting `sync` to true
+function update_hr_ksu_into_profile() {
+  # Base KSU generation from template
+  ## `TEMPLATES_DIR` is the result of:
+  ## "{{inputs.parameters.sw_catalogs_mount_path}}/{{inputs.parameters.cloned_sw_catalogs_folder_name}}/{{inputs.parameters.templates_path}}"
+  local TEMPLATES_DIR="$1"
+  local SUBSTITUTE_ENVIRONMENT="${2:-"false"}"
+  local SUBSTITUTION_FILTER="${3:-""}"
+  local CUSTOM_ENV_VARS="${4:-""}"
+  # Patch HelmRelease in KSU with inline values
+  local KUSTOMIZATION_NAME="$5"
+  local HELMRELEASE_NAME="$6"
+  local INLINE_VALUES="${7:-""}"
+  # Secret reference and generation (if required)
+  local IS_PREEXISTING_SECRET="${8:-"false"}"
+  local TARGET_NS="$9"
+  local VALUES_SECRET_NAME="${10}"
+  local SECRET_KEY="${11:-"values.yaml"}"
+  local AGE_PUBLIC_KEY="${12}"
+  ## `SECRET_VALUES` will be obtained from the
+  ## secret named after the input parameter `reference_secret_for_values`,
+  ## and from the key named after the input parameter `reference_key_for_values`
+  local LOCAL_SECRET_VALUES="${13:-"${SECRET_VALUES}"}"
+  # ConfigMap reference and generation (if required)
+  local IS_PREEXISTING_CM="${14:-"false"}"
+  local VALUES_CM_NAME="${15:-""}"
+  local CM_KEY="${16:-""}"
+  local CM_VALUES="${17:-""}"
+  # KSU rendering
+  local KSU_NAME="${18}"
+  local PROFILE_NAME="${19}"
+  local PROFILE_TYPE="${20}"
+  local PROJECT_NAME="${21:-"osm_admin"}"
+  ## `FLEET_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.fleet_mount_path}}/{{inputs.parameters.cloned_fleet_folder_name}}"
+  local FLEET_REPO_DIR="${22:-"/fleet/fleet-osm/"}"
+  # local SYNC="${23:-"true"}"
+
+
+  # This function is just an alias of `create_hr_ksu_into_profile`
+  # forcing synchronization over the KSU folder
+  create_hr_ksu_into_profile \
+    "${TEMPLATES_DIR}" \
+    "${SUBSTITUTE_ENVIRONMENT}" \
+    "${SUBSTITUTION_FILTER}" \
+    "${CUSTOM_ENV_VARS}" \
+    "${KUSTOMIZATION_NAME}" \
+    "${HELMRELEASE_NAME}" \
+    "${INLINE_VALUES}" \
+    "${IS_PREEXISTING_SECRET}" \
+    "${TARGET_NS}" \
+    "${VALUES_SECRET_NAME}" \
+    "${SECRET_KEY}" \
+    "${AGE_PUBLIC_KEY}" \
+    "${LOCAL_SECRET_VALUES}" \
+    "${IS_PREEXISTING_CM}" \
+    "${VALUES_CM_NAME}" \
+    "${CM_KEY}" \
+    "${CM_VALUES}" \
+    "${KSU_NAME}" \
+    "${PROFILE_NAME}" \
+    "${PROFILE_TYPE}" \
+    "${PROJECT_NAME}" \
+    "${FLEET_REPO_DIR}" \
+    "true"
+}
+
+
+# High-level function to create a "generated" KSU into a profile when:
+# 1. There is no template (OKA) available.
+# 2. The SW is based on a Helm Chart that we want to deploy.
+function create_generated_ksu_from_helm_into_profile() {
+  # HelmRelease generation
+  local HELMRELEASE_NAME="$1"
+  local CHART_NAME="$2"
+  local CHART_VERSION="$3"
+  local TARGET_NS="$4"
+  local CREATE_NS="${5:-"true"}"
+  # Repo source generation
+  local IS_PREEXISTING_REPO="${6:-"false"}"
+  local HELMREPO_NAME="$7"
+  local HELMREPO_URL="${8:-""}"
+  local HELMREPO_NS="${9:-"${TARGET_NS}"}"
+  local HELMREPO_SECRET_REF="${10:-""}"
+  # HelmRelease inline values (if any)
+  local INLINE_VALUES="${11:-""}"
+  # Secret reference and generation (if required)
+  local IS_PREEXISTING_SECRET="${12:-"false"}"
+  local VALUES_SECRET_NAME="${13}"
+  local SECRET_KEY="${14:-"values.yaml"}"
+  local AGE_PUBLIC_KEY="${15}"
+  ## `SECRET_VALUES` will be obtained from the
+  ## secret named after the input parameter `reference_secret_for_values`,
+  ## and from the key named after the input parameter `reference_key_for_values`
+  local LOCAL_SECRET_VALUES="${16:-"${SECRET_VALUES}"}"
+  # ConfigMap reference and generation (if required)
+  local IS_PREEXISTING_CM="${17:-"false"}"
+  local VALUES_CM_NAME="${18:-""}"
+  local CM_KEY="${19:-""}"
+  local CM_VALUES="${20:-""}"
+  # KSU rendering
+  local KSU_NAME="${21}"
+  local PROFILE_NAME="${22}"
+  local PROFILE_TYPE="${23}"
+  local PROJECT_NAME="${24:-"osm_admin"}"
+  ## `FLEET_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.fleet_mount_path}}/{{inputs.parameters.cloned_fleet_folder_name}}"
+  local FLEET_REPO_DIR="${25:-"/fleet/fleet-osm/"}"
+  # By default, it will not syncronize, so that we can easily accumulate more than
+  # one Helm chart into the same KSU if desired
+  local SYNC="${26:-"false"}"
+
+  # Decides which steps may be skipped
+  local NEEDS_NEW_NS=$([[ "${CREATE_NS,,}" == "true" ]]; echo $?)
+  local NEEDS_NEW_REPO_SOURCE=$([[ "${IS_PREEXISTING_REPO,,}" == "false" ]]; echo $?)
+  local NEEDS_NEW_SECRET=$([[ ( -n "${VALUES_SECRET_NAME}" ) && ( "${IS_PREEXISTING_SECRET,,}" == "false" ) ]]; echo $?)
+  local NEEDS_NEW_CM=$([[ ( -n "${VALUES_CM_NAME}" ) && ( "${IS_PREEXISTING_CM,,}" == "false" ) ]]; echo $?)
+  local ECHO_RESOURCELIST=$([[ "${DEBUG,,}" == "true" ]]; echo $?)
+
+  # Determine extra options for HelmRelease creation and define full command
+  OPTION_CHART_VERSION=""
+  [[ -n "${CHART_VERSION}" ]] && OPTION_CHART_VERSION='--chart-version=${CHART_VERSION}'
+  OPTION_INLINE_VALUES=""
+  [[ -n "${INLINE_VALUES}" ]] && OPTION_INLINE_VALUES='--values=<(
+    echo "${INLINE_VALUES}"
+  )'
+  OPTION_REFERENCE_SECRET=""
+  [[ -n "${VALUES_SECRET_NAME}" ]] && OPTION_REFERENCE_SECRET='--values-from=Secret/${VALUES_SECRET_NAME}'
+  OPTION_REFERENCE_CM=""
+  [[ -n "${VALUES_CM_NAME}" ]] && OPTION_REFERENCE_CM='--values-from=ConfigMap/${VALUES_CM_NAME}'
+
+  export HR_COMMAND="\
+    flux \
+      -n "${TARGET_NS}" \
+      create hr "${HELMRELEASE_NAME}" \
+      --chart="${CHART_NAME}" \
+      --source=HelmRepository/"${HELMREPO_NAME}.${HELMREPO_NS}" \
+      "${OPTION_CHART_VERSION}" \
+      "${OPTION_INLINE_VALUES}" \
+      "${OPTION_REFERENCE_SECRET}" \
+      "${OPTION_REFERENCE_CM}" \
+      --export
+  "
+
+  # Determine extra options for Helm source repo creation and define full command
+  OPTION_REPO_SECRET=""
+  [[ -n "${HELMREPO_SECRET_REF}" ]] && OPTION_REPO_SECRET='--secret-ref=${HELMREPO_SECRET_REF}'
+
+  export REPO_COMMAND="\
+    flux \
+      -n "${HELMREPO_NS}" \
+      create source helm "${HELMREPO_NAME}" \
+      --url="${HELMREPO_URL}" \
+      "${OPTION_REPO_SECRET}" \
+      --export
+  "
+
+  # Runs workflow
+  echo "" | \
+  make_generator \
+    "helm-release.yaml" \
+    eval "${HR_COMMAND}" | \
+  transform_if \
+    "${NEEDS_NEW_NS}" \
+    make_generator \
+      "ns-for-hr.yaml" \
+      kubectl \
+      create \
+      namespace \
+      "${TARGET_NS}" \
+      -o=yaml \
+      --dry-run=client | \
+  transform_if \
+    "${NEEDS_NEW_REPO_SOURCE}" \
+    make_generator \
+      "helm-repo.yaml" \
+      eval "${REPO_COMMAND}" | \
+  transform_if \
+    "${NEEDS_NEW_SECRET}" \
+    make_generator \
+      "hr-values-secret.yaml" \
+      kubectl_encrypt \
+        "${AGE_PUBLIC_KEY}" \
+        create \
+        secret \
+        generic \
+        "${VALUES_SECRET_NAME}" \
+        --namespace="${TARGET_NS}" \
+        --from-file="${SECRET_KEY}"=<(echo "${LOCAL_SECRET_VALUES}") \
+        -o=yaml \
+        --dry-run=client | \
+  transform_if \
+    "${NEEDS_NEW_CM}" \
+    make_generator \
+      "hr-values-configmap.yaml" \
+      kubectl \
+      create \
+      configmap \
+      "${VALUES_CM_NAME}" \
+      --namespace="${TARGET_NS}" \
+      --from-file="${SECRET_KEY}"=<(echo "${CM_VALUES}") \
+      -o=yaml \
+      --dry-run=client | \
+  transform_if \
+    "${ECHO_RESOURCELIST}" \
+    tee /dev/stderr | \
+  render_ksu_into_profile \
+    "${KSU_NAME}" \
+    "${PROFILE_NAME}" \
+    "${PROFILE_TYPE}" \
+    "${PROJECT_NAME}" \
+    "${FLEET_REPO_DIR}" \
+    "${SYNC}"
+}
+
+
+# High-level function to update a "generated" KSU:
+# 1. There is no template (OKA) available.
+# 2. The SW is based on a Helm Chart that we want to deploy.
+# NOTE: It is an alias of `create_generated_ksu_from_helm_into_profile`, setting `sync` to true
+function update_generated_ksu_from_helm_into_profile() {
+  # HelmRelease generation
+  local HELMRELEASE_NAME="$1"
+  local CHART_NAME="$2"
+  local CHART_VERSION="$3"
+  local TARGET_NS="$4"
+  local CREATE_NS="${5:-"true"}"
+  # Repo source generation
+  local IS_PREEXISTING_REPO="${6:-"false"}"
+  local HELMREPO_NAME="$7"
+  local HELMREPO_URL="${8:-""}"
+  local HELMREPO_NS="${9:-"${TARGET_NS}"}"
+  local HELMREPO_SECRET_REF="${10:-""}"
+  # HelmRelease inline values (if any)
+  local INLINE_VALUES="${11:-""}"
+  # Secret reference and generation (if required)
+  local IS_PREEXISTING_SECRET="${12:-"false"}"
+  local VALUES_SECRET_NAME="${13}"
+  local SECRET_KEY="${14:-"values.yaml"}"
+  local AGE_PUBLIC_KEY="${15}"
+  ## `SECRET_VALUES` will be obtained from the
+  ## secret named after the input parameter `reference_secret_for_values`,
+  ## and from the key named after the input parameter `reference_key_for_values`
+  local LOCAL_SECRET_VALUES="${16:-"${SECRET_VALUES}"}"
+  # ConfigMap reference and generation (if required)
+  local IS_PREEXISTING_CM="${17:-"false"}"
+  local VALUES_CM_NAME="${18:-""}"
+  local CM_KEY="${19:-""}"
+  local CM_VALUES="${20:-""}"
+  # KSU rendering
+  local KSU_NAME="${21}"
+  local PROFILE_NAME="${22}"
+  local PROFILE_TYPE="${23}"
+  local PROJECT_NAME="${24:-"osm_admin"}"
+  ## `FLEET_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.fleet_mount_path}}/{{inputs.parameters.cloned_fleet_folder_name}}"
+  local FLEET_REPO_DIR="${25:-"/fleet/fleet-osm/"}"
+  # By default, it will not syncronize, so that we can easily accumulate more than
+  # one Helm chart into the same KSU if desired
+  # local SYNC="${26:-"false"}"
+
+  # Decides which steps may be skipped
+  local NEEDS_NEW_NS=$([[ "${CREATE_NS,,}" == "true" ]]; echo $?)
+  local NEEDS_NEW_REPO_SOURCE=$([[ "${IS_PREEXISTING_REPO,,}" == "false" ]]; echo $?)
+  local NEEDS_NEW_SECRET=$([[ ( -n "${VALUES_SECRET_NAME}" ) && ( "${IS_PREEXISTING_SECRET,,}" == "false" ) ]]; echo $?)
+  local NEEDS_NEW_CM=$([[ ( -n "${VALUES_CM_NAME}" ) && ( "${IS_PREEXISTING_CM,,}" == "false" ) ]]; echo $?)
+  local ECHO_RESOURCELIST=$([[ "${DEBUG,,}" == "true" ]]; echo $?)
+
+
+  # This function is just an alias of `create_generated_ksu_from_helm_into_profile`
+  # forcing synchronization over the KSU folder
+  create_generated_ksu_from_helm_into_profile \
+    "${HELMRELEASE_NAME}" \
+    "${CHART_NAME}" \
+    "${CHART_VERSION}" \
+    "${TARGET_NS}" \
+    "${CREATE_NS}" \
+    "${IS_PREEXISTING_REPO}" \
+    "${HELMREPO_NAME}" \
+    "${HELMREPO_URL}" \
+    "${HELMREPO_NS}" \
+    "${HELMREPO_SECRET_REF}" \
+    "${INLINE_VALUES}" \
+    "${IS_PREEXISTING_SECRET}" \
+    "${VALUES_SECRET_NAME}" \
+    "${SECRET_KEY}" \
+    "${AGE_PUBLIC_KEY}" \
+    "${LOCAL_SECRET_VALUES}" \
+    "${IS_PREEXISTING_CM}" \
+    "${VALUES_CM_NAME}" \
+    "${CM_KEY}" \
+    "${CM_VALUES}" \
+    "${KSU_NAME}" \
+    "${PROFILE_NAME}" \
+    "${PROFILE_TYPE}" \
+    "${PROJECT_NAME}" \
+    "${FLEET_REPO_DIR}" \
+    "true"
+}
+
+
+# Low-level function to delete a KSU from a profile
+function delete_ksu_from_profile_path() {
+  local KSU_NAME="$1"
+  local TARGET_PROFILE_PATH="$2"
+  local FLEET_REPO_DIR="${3:-"${FLEET_REPO_DIR}"}"
+
+  # Calculate profile folder
+  TARGET_PROFILE_FOLDER="${FLEET_REPO_DIR}/${TARGET_PROFILE_PATH}"
+
+  # Delete the KSU folder
+  rm -rf "${TARGET_PROFILE_FOLDER}/${KSU_NAME}"
+}
+
+
+# High-level function to delete a KSU from a profile
+function delete_ksu_from_profile() {
+  local KSU_NAME="$1"
+  local PROFILE_NAME="$2"
+  local PROFILE_TYPE="$3"
+  local PROJECT_NAME="${4:-"osm_admin"}"
+  ## `FLEET_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.fleet_mount_path}}/{{inputs.parameters.cloned_fleet_folder_name}}"
+  local FLEET_REPO_DIR="$5"
+
+  # Calculate profile folder
+  local TARGET_PROFILE_PATH=$(
+    path_to_profile \
+      "${PROFILE_NAME}" \
+      "${PROFILE_TYPE}" \
+      "${PROJECT_NAME}"
+  )
+  TARGET_PROFILE_FOLDER="${FLEET_REPO_DIR}/${TARGET_PROFILE_PATH}"
+
+  # Delete the KSU folder
+  rm -rf "${TARGET_PROFILE_FOLDER}/${KSU_NAME}"
+}
+
+
+# High-level function to clone a KSU from a profile to another
+function clone_ksu() {
+  local SOURCE_KSU_NAME="$1"
+  local SOURCE_PROFILE_NAME="$2"
+  local SOURCE_PROFILE_TYPE="$3"
+  local SOURCE_PROJECT_NAME="${4:-"osm_admin"}"
+  local DESTINATION_KSU_NAME="${5:-"${SOURCE_KSU_NAME}"}"
+  local DESTINATION_PROFILE_NAME="${6:-"${SOURCE_PROFILE_NAME}"}"
+  local DESTINATION_PROFILE_TYPE="${7:-"${SOURCE_PROFILE_TYPE}"}"
+  local DESTINATION_PROJECT_NAME="${8:-"${SOURCE_PROJECT_NAME}"}"
+  ## `FLEET_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.fleet_mount_path}}/{{inputs.parameters.cloned_fleet_folder_name}}"
+  local FLEET_REPO_DIR="$9"
+
+
+  # If source and destination are identical, aborts
+  if [[
+    ("${SOURCE_KSU_NAME}" == "${DESTINATION_KSU_NAME}") && \
+    ("${SOURCE_PROFILE_NAME}" == "${DESTINATION_PROFILE_NAME}") && \
+    ("${SOURCE_PROFILE_TYPE}" == "${DESTINATION_PROFILE_TYPE}") && \
+    ("${SOURCE_PROJECT_NAME}" == "${DESTINATION_PROJECT_NAME}") \
+  ]];
+  then
+    return 1
+  fi
+
+  # Calculate profile folders
+  local SOURCE_PROFILE_PATH=$(
+    path_to_profile \
+      "${SOURCE_PROFILE_NAME}" \
+      "${SOURCE_PROFILE_TYPE}" \
+      "${SOURCE_PROJECT_NAME}"
+  )
+  local SOURCE_PROFILE_FOLDER="${FLEET_REPO_DIR}/${SOURCE_PROFILE_PATH}"
+  local DESTINATION_PROFILE_PATH=$(
+    path_to_profile \
+      "${DESTINATION_PROFILE_NAME}" \
+      "${DESTINATION_PROFILE_TYPE}" \
+      "${DESTINATION_PROJECT_NAME}"
+  )
+  local DESTINATION_PROFILE_FOLDER="${FLEET_REPO_DIR}/${DESTINATION_PROFILE_PATH}"
+
+  # Clone KSU folder
+  cp -ar \
+    "${SOURCE_PROFILE_FOLDER}/${SOURCE_KSU_NAME}" \
+    "${DESTINATION_PROFILE_FOLDER}/${DESTINATION_KSU_NAME}"
+}
+
+
+# Create a `ProviderConfig` for a CrossPlane provider
+function create_crossplane_providerconfig() {
+  local PROVIDERCONFIG_NAME="$1"
+  # As of today, one among `azure`, `aws` or `gcp`:
+  local PROVIDER_TYPE="$2"
+  local CRED_SECRET_NAME="$3"
+  local CRED_SECRET_KEY="${4:-"creds"}"
+  local CRED_SECRET_NS="${5:-"crossplane-system"}"
+  # If empty, it assumes the secret already exists
+  local CRED_SECRET_CONTENT="${6:-"${CRED_SECRET_CONTENT:-""}"}"
+  local AGE_PUBLIC_KEY_MGMT="$7"
+  ## `FLEET_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.fleet_mount_path}}/{{inputs.parameters.cloned_fleet_folder_name}}"
+  local FLEET_REPO_DIR="${8:-"${FLEET_REPO_DIR}"}"
+  ## `SW_CATALOGS_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.sw_catalogs_mount_path}}/{{inputs.parameters.cloned_sw_catalogs_folder_name}}"
+  local SW_CATALOGS_REPO_DIR="${9:-"${SW_CATALOGS_REPO_DIR}"}"
+  # Only when applicable
+  local TARGET_GCP_PROJECT="${10:-""}"
+  # Do not touch unless strictly needed
+  local BASE_TEMPLATES_PATH="${11:-"infra-configs/crossplane/providers"}"
+  local OSM_PROJECT_NAME="${12:-"osm_admin"}"
+  local MGMT_CLUSTER_NAME="${13:-"_management"}"
+
+
+  # Is the provider type supported?
+  local VALID_PROVIDERS=("aws" "azure" "gcp")
+  PROVIDER_TYPE="${PROVIDER_TYPE,,}"
+  [[ ! ($(echo ${VALID_PROVIDERS[@]} | grep -w "${PROVIDER_TYPE}")) ]] && return 1
+
+  # Determines the source dir for the templates and the target folder in Fleet
+  local TEMPLATES_DIR="${SW_CATALOGS_REPO_DIR}/${BASE_TEMPLATES_PATH}/${PROVIDER_TYPE}/templates"
+  local TARGET_FOLDER="${FLEET_REPO_DIR}/${OSM_PROJECT_NAME}/infra-config-profiles/${MGMT_CLUSTER_NAME}/crossplane-providerconfigs/${PROVIDER_TYPE}"
+
+  # Determine which optional steps may be needed
+  local NEEDS_NEW_SECRET=$([[ -n "${CRED_SECRET_CONTENT}" ]]; echo $?)
+  local NEEDS_PROJECT_NAME=$([[ "${PROVIDER_TYPE}" == "gcp" ]]; echo $?)
+
+  # Renders the `ProviderConfig` manifest and the encrypted secret (if applicable)
+  echo "" | \
+  folder2list_generator \
+    "${TEMPLATES_DIR}" | \
+  patch_replace \
+    ".metadata.name" \
+    "${PROVIDERCONFIG_NAME}" \
+    "| select(.kind == \"ProviderConfig\")" | \
+  patch_replace \
+    ".spec.credentials.secretRef.name" \
+    "${CRED_SECRET_NAME}" \
+    "| select(.kind == \"ProviderConfig\")" | \
+  patch_replace \
+    ".spec.credentials.secretRef.key" \
+    "${CRED_SECRET_KEY}" \
+    "| select(.kind == \"ProviderConfig\")" | \
+  patch_replace \
+    ".spec.credentials.secretRef.namespace" \
+    "${CRED_SECRET_NS}" \
+    "| select(.kind == \"ProviderConfig\")" | \
+  transform_if \
+    "${NEEDS_PROJECT_NAME}" \
+    patch_replace \
+      ".spec.projectID" \
+      "${TARGET_GCP_PROJECT}" \
+      "| select(.kind == \"ProviderConfig\")" | \
+  transform_if \
+    "${NEEDS_NEW_SECRET}" \
+    make_generator \
+      "credentials-secret.yaml" \
+      kubectl_encrypt \
+        "${AGE_PUBLIC_KEY_MGMT}" \
+        create \
+        secret \
+        generic \
+        "${CRED_SECRET_NAME}" \
+        --namespace="${CRED_SECRET_NS}" \
+        --from-file="${CRED_SECRET_KEY}"=<(echo "${CRED_SECRET_CONTENT}") \
+        -o=yaml \
+        --dry-run=client | \
+  prepend_folder_path \
+    "${PROVIDERCONFIG_NAME}/" | \
+  list2folder_cp_over \
+    "${TARGET_FOLDER}"
+}
+
+
+# Delete a `ProviderConfig` for a CrossPlane provider
+function delete_crossplane_providerconfig() {
+  local PROVIDERCONFIG_NAME="$1"
+  # As of today, one among `azure`, `aws` or `gcp`:
+  local PROVIDER_TYPE="$2"
+  ## `FLEET_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.fleet_mount_path}}/{{inputs.parameters.cloned_fleet_folder_name}}"
+  local FLEET_REPO_DIR="${3:-"${FLEET_REPO_DIR}"}"
+  # Do not touch unless strictly needed
+  local OSM_PROJECT_NAME="${4:-"osm_admin"}"
+  local MGMT_CLUSTER_NAME="${5:-"_management"}"
+
+
+  # Is the provider type supported?
+  local VALID_PROVIDERS=("aws" "azure" "gcp")
+  PROVIDER_TYPE="${PROVIDER_TYPE,,}"
+  [[ ! ($(echo ${VALID_PROVIDERS[@]} | grep -w "${PROVIDER_TYPE}")) ]] && return 1
+
+  # Determines the target folder in Fleet
+  local PROVIDERCONFIG_FOLDER="${FLEET_REPO_DIR}/${OSM_PROJECT_NAME}/infra-config-profiles/${MGMT_CLUSTER_NAME}/crossplane-providerconfigs/${PROVIDER_TYPE}/${PROVIDERCONFIG_NAME}"
+
+  # Delete the folder
+  rm -rf "${PROVIDERCONFIG_FOLDER}"
+}
+
+
+# Update a `ProviderConfig` for a CrossPlane provider
+function update_crossplane_providerconfig() {
+  local PROVIDERCONFIG_NAME="$1"
+  # As of today, one among `azure`, `aws` or `gcp`:
+  local PROVIDER_TYPE="$2"
+  local CRED_SECRET_NAME="$3"
+  local CRED_SECRET_KEY="${4:-"creds"}"
+  local CRED_SECRET_NS="${5:-"crossplane-system"}"
+  # If empty, it assumes the secret already exists
+  local CRED_SECRET_CONTENT="${6:-"${CRED_SECRET_CONTENT:-""}"}"
+  local AGE_PUBLIC_KEY_MGMT="$7"
+  ## `FLEET_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.fleet_mount_path}}/{{inputs.parameters.cloned_fleet_folder_name}}"
+  local FLEET_REPO_DIR="${8:-"${FLEET_REPO_DIR}"}"
+  ## `SW_CATALOGS_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.sw_catalogs_mount_path}}/{{inputs.parameters.cloned_sw_catalogs_folder_name}}"
+  local SW_CATALOGS_REPO_DIR="${9:-"${SW_CATALOGS_REPO_DIR}"}"
+  # Only when applicable
+  local TARGET_GCP_PROJECT="${10:-""}"
+  # Do not touch unless strictly needed
+  local BASE_TEMPLATES_PATH="${11:-"infra-configs/crossplane/providers"}"
+  local OSM_PROJECT_NAME="${12:-"osm_admin"}"
+  local MGMT_CLUSTER_NAME="${13:-"_management"}"
+
+
+  # Is the provider type supported?
+  local VALID_PROVIDERS=("aws" "azure" "gcp")
+  PROVIDER_TYPE="${PROVIDER_TYPE,,}"
+  [[ ! ($(echo ${VALID_PROVIDERS[@]} | grep -w "${PROVIDER_TYPE}")) ]] && return 1
+
+  # First, delete; then, re-create
+  delete_crossplane_providerconfig \
+    "${PROVIDERCONFIG_NAME}" \
+    "${PROVIDER_TYPE}" \
+    "${FLEET_REPO_DIR}" \
+    "${OSM_PROJECT_NAME}" \
+    "${MGMT_CLUSTER_NAME}"
+
+  create_crossplane_providerconfig \
+    "${PROVIDERCONFIG_NAME}" \
+    "${PROVIDER_TYPE}" \
+    "${CRED_SECRET_NAME}" \
+    "${CRED_SECRET_KEY}" \
+    "${CRED_SECRET_NS}" \
+    "${CRED_SECRET_CONTENT}" \
+    "${AGE_PUBLIC_KEY_MGMT}" \
+    "${FLEET_REPO_DIR}" \
+    "${SW_CATALOGS_REPO_DIR}" \
+    "${TARGET_GCP_PROJECT}" \
+    "${BASE_TEMPLATES_PATH}" \
+    "${OSM_PROJECT_NAME}" \
+    "${MGMT_CLUSTER_NAME}"
+}
+
+
+# Helper function to return the relative path of a location in SW Catalogs for an OKA
+function path_to_catalog() {
+  local OKA_TYPE="$1"
+  local PROJECT_NAME="${2:-"osm_admin"}"
+
+  # Corrects `osm_admin` project, since it uses the root folder
+  PROJECT_NAME="${PROJECT_NAME}"
+  [[ "${PROJECT_NAME}" == "osm_admin" ]] && PROJECT_NAME="."
+
+  # Echoes the relate path from the SW-Catalogs root
+  case "${OKA_TYPE,,}" in
+
+    "controller" | "infra-controller" | "infra-controllers" | "infra_controller" | "infra_controllers")
+      echo -n "${PROJECT_NAME}/infra-controllers"
+      return 0
+      ;;
+
+    "config" | "infra-config" | "infra-configs" | "infra_config" | "infra_configs")
+      echo -n "${PROJECT_NAME}/infra-configs"
+      return 0
+      ;;
+
+    "managed" | "resources" | "managed-resources" | "managed_resources" | "cloud-resources" | "cloud_resources")
+      echo -n "${PROJECT_NAME}/cloud-resources"
+      return 0
+      ;;
+
+     "app" |"apps" | "applications" | "cnf" | "cnfs" | "nf" | "nfs")
+      echo -n "${PROJECT_NAME}/apps"
+      return 0
+      ;;
+
+    *)
+      echo -n "------------ ERROR ------------"
+      return 1
+      ;;
+  esac
+}
+
+
+# Create OKA of a specific kind
+function create_oka() {
+  local OKA_NAME="$1"
+  local OKA_TYPE="$2"
+  local PROJECT_NAME="${3:-"."}"
+  ## `SW_CATALOGS_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.sw_catalogs_mount_path}}/{{inputs.parameters.cloned_sw_catalogs_folder_name}}"
+  local SW_CATALOGS_REPO_DIR="$4"
+  local OKA_LOCATION="${5:-"."}"
+  local TARBALL_FILE="${6:-"true"}"
+
+
+  # Finds the corresponding catalog path from the SW-Catalogs root
+  # and create the destination
+  local CATALOG_PATH=$(\
+    path_to_catalog \
+      "${OKA_TYPE}" \
+      "${PROJECT_NAME}"
+  )
+  local DESTINATION="${SW_CATALOGS_REPO_DIR}/${CATALOG_PATH}/${OKA_NAME}"
+  mkdir -p "${DESTINATION}"
+
+  # When the OKA comes as a `tar.gz`
+  if [[ "${TARBALL_FILE,,}" == "true" ]];
+  then
+    tar xvfz "${OKA_LOCATION}/${OKA_NAME}.tar.gz" -C "${DESTINATION}"
+  else
+  # Otherwise it must be a folder structure
+    cp -var "${OKA_LOCATION}/${OKA_NAME}/*" "${DESTINATION}/"
+  fi
+}
+
+
+# Delete OKA of a specific kind
+function delete_oka() {
+  local OKA_NAME="$1"
+  local OKA_TYPE="$2"
+  local PROJECT_NAME="${3:-"."}"
+  ## `SW_CATALOGS_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.sw_catalogs_mount_path}}/{{inputs.parameters.cloned_sw_catalogs_folder_name}}"
+  local SW_CATALOGS_REPO_DIR="$4"
+
+
+  # Finds the corresponding catalog path from the SW-Catalogs root
+  # and determine the destination
+  local CATALOG_PATH=$(\
+    path_to_catalog \
+      "${OKA_TYPE}" \
+      "${PROJECT_NAME}"
+  )
+  local DESTINATION="${SW_CATALOGS_REPO_DIR}/${CATALOG_PATH}/${OKA_NAME}"
+
+  # Remove the folder
+  rm -rf "${DESTINATION}"
+}
+
+
+# Update OKA of a specific kind
+function update_oka() {
+  local OKA_NAME="$1"
+  local OKA_TYPE="$2"
+  local PROJECT_NAME="${3:-"."}"
+  ## `SW_CATALOGS_REPO_DIR` is the result of:
+  ## "{{inputs.parameters.sw_catalogs_mount_path}}/{{inputs.parameters.cloned_sw_catalogs_folder_name}}"
+  local SW_CATALOGS_REPO_DIR="$4"
+  local OKA_LOCATION="${5:-"."}"
+  local TARBALL_FILE="${6:-"true"}"
+
+
+  # Finds the corresponding catalog path from the SW-Catalogs root
+  # and determine the destination
+  local CATALOG_PATH=$(\
+    path_to_catalog \
+      "${OKA_TYPE}" \
+      "${PROJECT_NAME}"
+  )
+  local DESTINATION="${SW_CATALOGS_REPO_DIR}/${CATALOG_PATH}/${OKA_NAME}"
+
+  # Remove and re-create
+  rm -rf "${DESTINATION}"
+  create_oka \
+    "${OKA_NAME}" \
+    "${OKA_TYPE}" \
+    "${PROJECT_NAME}" \
+    "${SW_CATALOGS_REPO_DIR}" \
+    "${OKA_LOCATION}" \
+    "${TARBALL_FILE}"
+}

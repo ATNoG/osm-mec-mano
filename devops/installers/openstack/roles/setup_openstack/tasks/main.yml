@@ -1,0 +1,158 @@
+---
+#   Copyright 2020 British Telecommunications plc
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#   Author: Antonio Marsico (antonio.marsico@bt.com)
+
+- name: Looking for the OpenStack external network
+  openstack.cloud.networks_info:
+    cloud: "{{ cloud_name }}"
+    filters:
+      name: "{{ external_network_name }}"
+  register: openstack_external_networks
+
+- name: Show OpenStack networks
+  debug:
+    msg: "{{ openstack_external_networks.openstack_networks }}"
+    verbosity: 2
+
+- name: Gather information about previously created subnets
+  openstack.cloud.subnets_info:
+    cloud: "{{ cloud_name }}"
+    name: "{{ openstack_external_networks.openstack_networks[0].subnets[0] }}"
+  register: subnet_info
+
+- name: Show openstack subnets
+  debug:
+    msg: "{{ subnet_info.openstack_subnets[0] }}"
+    verbosity: 2
+
+- set_fact:
+    cidr: "{{ subnet_info.openstack_subnets[0].cidr }}"
+
+- name: Creating a new openstack flavor
+  openstack.cloud.compute_flavor:
+    cloud: "{{ cloud_name }}"
+    state: present
+    name: "{{os_flavor.name}}"
+    ram: "{{os_flavor.ram}}"
+    vcpus: "{{os_flavor.cpu}}"
+    disk: "{{os_flavor.disk}}"
+
+- name: Gather information about OpenStack images
+  openstack.cloud.image_info:
+    cloud: "{{ cloud_name }}"
+    image: "{{ item.image }}"
+  with_items: "{{ servers }}"
+  register: image_query
+
+- name: Show OpenStack image information
+  debug:
+    msg: "{{ item.openstack_image }}"
+    verbosity: 2
+  with_items: "{{ image_query.results }}"
+  when: item.openstack_image != none
+
+# Missing SHA256 check if we want to update an image
+
+- name: Downloading images
+  get_url:
+    url: "{{item.0.image_url}}"
+    dest: "/tmp/{{ item.0.image }}.img"
+    mode: '644'
+  loop: "{{ servers |product(image_query.results)|list }}"
+  when: item.1.openstack_image == none and item.0.image == item.1.item.image
+
+- name: Creating images
+  openstack.cloud.image:
+    cloud: "{{ cloud_name }}"
+    name: "{{ item.0.image }}"
+    container_format: bare
+    disk_format: qcow2
+    state: present
+    filename: "/tmp/{{ item.0.image }}.img"
+  loop: "{{ servers |product(image_query.results)|list }}"
+  when: item.1.openstack_image == none and item.0.image == item.1.item.image
+
+- name: Removing tmp image files
+  file:
+    path: "/tmp/{{ item.image }}.img"
+    state: absent
+  with_items: "{{ servers }}"
+
+- name: Creating a security group
+  openstack.cloud.security_group:
+    cloud: "{{ cloud_name }}"
+    state: present
+    name: "{{external_network_name}}_access"
+    description: Security group for LAN external access
+
+- name: Creating ICMP rule
+  openstack.cloud.security_group_rule:
+    cloud: "{{ cloud_name }}"
+    security_group: "{{external_network_name}}_access"
+    protocol: icmp
+    remote_ip_prefix: 0.0.0.0/0
+
+- name: Creating TCP access rule
+  openstack.cloud.security_group_rule:
+    cloud: "{{ cloud_name }}"
+    security_group: "{{external_network_name}}_access"
+    protocol: tcp
+    remote_ip_prefix: "{{ cidr }}"
+
+- name: Allow HTTP from anywhere
+  openstack.cloud.security_group_rule:
+    cloud: "{{ cloud_name }}"
+    security_group: "{{external_network_name}}_access"
+    protocol: tcp
+    port_range_min: 80
+    port_range_max: 80
+    remote_ip_prefix: 0.0.0.0/0
+
+- name: Allow SSH from anywhere
+  openstack.cloud.security_group_rule:
+    cloud: "{{ cloud_name }}"
+    security_group: "{{external_network_name}}_access"
+    protocol: tcp
+    port_range_min: 22
+    port_range_max: 22
+    remote_ip_prefix: 0.0.0.0/0
+
+- name: SSH key check
+  openstack.cloud.keypair:
+    cloud: "{{ cloud_name }}"
+    state: present
+    name: "{{ os_key_name }}"
+    public_key_file: "{{ key_file }}"
+  register: keypair
+
+- debug:
+    var: keypair
+    verbosity: 2
+
+- name: Creating the new ansible key
+  local_action:
+    module: copy
+    content: "{{ keypair.key.public_key }}"
+    dest: "~/.ssh/{{ keypair.key.name }}.pub"
+    mode: '600'
+  when: keypair.key.public_key != none and key_file == none
+
+- name: Creating the new ansible private key
+  local_action:
+    module: copy
+    content: "{{ keypair.key.private_key }}"
+    dest: "~/.ssh/{{ keypair.key.name }}"
+    mode: '600'
+  when: keypair.key.private_key != none and key_file == none

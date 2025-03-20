@@ -1,0 +1,55 @@
+# Copyright 2022 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+#
+# For those usages not covered by the Apache License, Version 2.0 please
+# contact: legal@canonical.com
+#
+# To get in touch with the maintainers, please contact:
+# osm-charmers@lists.launchpad.net
+#
+#
+# This file populates the Overview on Charmhub.
+# See https://juju.is/docs/some-url-to-be-determined/ for a checklist and guidance.
+
+name: osm-juju-simplestreams
+
+# The following metadata are human-readable and will be published prominently on Charmhub.
+
+display-name: Juju simplestreams
+
+summary: Basic http server exposing simplestreams for juju
+
+description: |
+  TODO
+
+containers:
+  server:
+    resource: server-image
+
+# This file populates the Resources tab on Charmhub.
+
+resources:
+  server-image:
+    type: oci-image
+    description: OCI image for server
+    upstream-source: nginx:1.23.0
+
+peers:
+  peer:
+    interface: peer
+
+requires:
+  ingress:
+    interface: ingress
+    limit: 1

@@ -1,0 +1,57 @@
+# 
+# Copyright 2020 Whitestack, LLC
+# *************************************************************
+#
+# This file is part of OSM common repository.
+# All Rights Reserved to Whitestack, LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+#
+# For those usages not covered by the Apache License, Version 2.0 please
+# contact: agarcia@whitestack.com
+##
+
+# General definitions of the package
+vnfd_id: native_charm-vnf
+vnf_product_name: native_charm-vnf
+vnf_provider_id: AFA
+vnf_software_version: 1.0
+vnf_package_version: 1.0
+vnf_release_date_time: 2021.12.01T11:36-03:00
+compatible_specification_versions: 3.3.1
+vnfm_info: OSM
+
+Source: Definitions/native_charm_vnfd.yaml
+Algorithm: SHA-256
+Hash: ede8daf9748ac4849e1a1aac955d6c84cafef9ea34067eaef76ee4e5996974c2
+
+Source: Scripts/cloud_init/cloud-config.txt
+Algorithm: SHA-256
+Hash: 7455ca868843cc5da1f0a2255cdedb64a69df3b618c344b83b82848a94540eda
+
+
+# The below sections are all wrong on purpose as they are intended for testing
+
+# Invalid hash algorithm
+Source: Scripts/charms/simple/src/charm.py
+Algorithm: SHA-733
+Hash: ea72f897a966e6174ed9164fabc3c500df5a2f712eb6b22ab2408afb07d04d14
+
+# Wrong hash
+Source: Scripts/charms/simple/hooks/start
+Algorithm: SHA-256
+Hash: 123456aaaaaa123456aaaaaae2bb9d0197f41619165dde6cf205c974f9aa86ae
+
+# Unspecified hash
+Source: Scripts/charms/simple/hooks/upgrade-charm
+Algorithm: SHA-256

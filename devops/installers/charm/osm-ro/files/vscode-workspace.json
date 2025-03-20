@@ -1,0 +1,34 @@
+{
+    "folders": [
+        {"path": "/usr/lib/python3/dist-packages/osm_ng_ro"},
+        {"path": "/usr/lib/python3/dist-packages/osm_common"},
+        {"path": "/usr/lib/python3/dist-packages/osm_ro_plugin"},
+        {"path": "/usr/lib/python3/dist-packages/osm_rosdn_arista_cloudvision"},
+        {"path": "/usr/lib/python3/dist-packages/osm_rosdn_dpb"},
+        {"path": "/usr/lib/python3/dist-packages/osm_rosdn_dynpac"},
+        {"path": "/usr/lib/python3/dist-packages/osm_rosdn_floodlightof"},
+        {"path": "/usr/lib/python3/dist-packages/osm_rosdn_ietfl2vpn"},
+        {"path": "/usr/lib/python3/dist-packages/osm_rosdn_juniper_contrail"},
+        {"path": "/usr/lib/python3/dist-packages/osm_rosdn_odlof"},
+        {"path": "/usr/lib/python3/dist-packages/osm_rosdn_onos_vpls"},
+        {"path": "/usr/lib/python3/dist-packages/osm_rosdn_onosof"},
+        {"path": "/usr/lib/python3/dist-packages/osm_rovim_aws"},
+        {"path": "/usr/lib/python3/dist-packages/osm_rovim_azure"},
+        {"path": "/usr/lib/python3/dist-packages/osm_rovim_gcp"},
+        {"path": "/usr/lib/python3/dist-packages/osm_rovim_openstack"},
+        {"path": "/usr/lib/python3/dist-packages/osm_rovim_vmware"},
+    ],
+    "launch": {
+        "configurations": [
+            {
+                "module": "osm_ng_ro.ro_main",
+                "name": "NG RO",
+                "request": "launch",
+                "type": "python",
+                "justMyCode": false,
+            }
+        ],
+        "version": "0.2.0",
+    },
+    "settings": {},
+}

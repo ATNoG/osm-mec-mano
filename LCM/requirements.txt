@@ -1,0 +1,223 @@
+#######################################################################################
+# Copyright ETSI Contributors and Others.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#######################################################################################
+aiohappyeyeballs==2.6.0
+    # via aiohttp
+aiohttp==3.11.13
+    # via -r requirements.in
+aiosignal==1.3.2
+    # via aiohttp
+annotated-types==0.7.0
+    # via pydantic
+async-timeout==4.0.3
+    # via
+    #   -r requirements.in
+    #   aiohttp
+    #   retrying-async
+attrs==25.1.0
+    # via
+    #   aiohttp
+    #   glom
+bcrypt==4.3.0
+    # via paramiko
+boltons==25.0.0
+    # via
+    #   face
+    #   glom
+cachetools==5.5.2
+    # via google-auth
+certifi==2025.1.31
+    # via
+    #   kubernetes
+    #   requests
+cffi==1.17.1
+    # via
+    #   cryptography
+    #   pynacl
+charset-normalizer==3.4.1
+    # via
+    #   -r requirements.in
+    #   requests
+checksumdir==1.2.0
+    # via -r requirements.in
+config-man==0.0.4
+    # via -r requirements.in
+cryptography==44.0.2
+    # via paramiko
+dnspython==2.7.0
+    # via pymongo
+durationpy==0.9
+    # via kubernetes
+face==24.0.0
+    # via glom
+fire==0.7.0
+    # via randomname
+frozenlist==1.5.0
+    # via
+    #   aiohttp
+    #   aiosignal
+glom==24.11.0
+    # via config-man
+google-auth==2.17.3
+    # via
+    #   -r requirements.in
+    #   kubernetes
+grpcio==1.71.0
+    # via grpcio-tools
+grpcio-tools==1.48.2
+    # via -r requirements.in
+grpclib==0.4.7
+    # via -r requirements.in
+h2==4.2.0
+    # via grpclib
+hpack==4.1.0
+    # via h2
+hyperframe==6.1.0
+    # via h2
+idna==3.10
+    # via
+    #   requests
+    #   yarl
+jinja2==3.1.6
+    # via -r requirements.in
+jsonpath-ng==1.7.0
+    # via -r requirements.in
+juju==2.9.44.0
+    # via -r requirements.in
+jujubundlelib==0.5.7
+    # via theblues
+kubernetes==32.0.1
+    # via
+    #   -r requirements.in
+    #   juju
+macaroonbakery==1.3.4
+    # via
+    #   juju
+    #   theblues
+markupsafe==3.0.2
+    # via jinja2
+motor==3.7.0
+    # via -r requirements.in
+multidict==6.1.0
+    # via
+    #   aiohttp
+    #   grpclib
+    #   yarl
+mypy-extensions==1.0.0
+    # via typing-inspect
+oauthlib==3.2.2
+    # via
+    #   kubernetes
+    #   requests-oauthlib
+paramiko==2.12.0
+    # via juju
+ply==3.11
+    # via jsonpath-ng
+propcache==0.3.0
+    # via
+    #   aiohttp
+    #   yarl
+protobuf==3.20.3
+    # via
+    #   -r requirements.in
+    #   grpcio-tools
+    #   macaroonbakery
+pyasn1==0.6.1
+    # via
+    #   -r requirements.in
+    #   juju
+    #   pyasn1-modules
+    #   rsa
+pyasn1-modules==0.4.1
+    # via google-auth
+pycparser==2.22
+    # via cffi
+pydantic==2.10.6
+    # via -r requirements.in
+pydantic-core==2.27.2
+    # via pydantic
+pymacaroons==0.13.0
+    # via macaroonbakery
+pymongo==4.11.2
+    # via motor
+pynacl==1.5.0
+    # via
+    #   macaroonbakery
+    #   paramiko
+    #   pymacaroons
+pyrfc3339==1.1
+    # via
+    #   juju
+    #   macaroonbakery
+python-dateutil==2.9.0.post0
+    # via kubernetes
+pytz==2025.1
+    # via pyrfc3339
+pyyaml==6.0.2
+    # via
+    #   -r requirements.in
+    #   juju
+    #   jujubundlelib
+    #   kubernetes
+randomname==0.2.1
+    # via -r requirements.in
+requests==2.32.3
+    # via
+    #   kubernetes
+    #   macaroonbakery
+    #   requests-oauthlib
+    #   theblues
+requests-oauthlib==2.0.0
+    # via kubernetes
+retrying-async==2.0.0
+    # via -r requirements.in
+rsa==4.9
+    # via google-auth
+six==1.17.0
+    # via
+    #   google-auth
+    #   kubernetes
+    #   macaroonbakery
+    #   paramiko
+    #   pymacaroons
+    #   python-dateutil
+termcolor==2.5.0
+    # via fire
+theblues==0.5.2
+    # via juju
+toposort==1.10
+    # via juju
+typing-extensions==4.12.2
+    # via
+    #   multidict
+    #   pydantic
+    #   pydantic-core
+    #   typing-inspect
+typing-inspect==0.9.0
+    # via juju
+urllib3==2.3.0
+    # via
+    #   kubernetes
+    #   requests
+websocket-client==1.8.0
+    # via kubernetes
+websockets==15.0.1
+    # via juju
+yarl==1.18.3
+    # via aiohttp
+
+# The following packages are considered to be unsafe in a requirements file:
+# setuptools

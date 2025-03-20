@@ -1,0 +1,72 @@
+# 
+# Copyright 2020 Whitestack, LLC
+# *************************************************************
+#
+# This file is part of OSM common repository.
+# All Rights Reserved to Whitestack, LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+#
+# For those usages not covered by the Apache License, Version 2.0 please
+# contact: agarcia@whitestack.com
+##
+
+# General definitions of the package
+vnfd_id: native_charm-vnf
+vnf_product_name: native_charm-vnf
+vnf_provider_id: AFA
+vnf_software_version: 1.0
+vnf_package_version: 1.0
+vnf_release_date_time: 2021.12.01T11:36-03:00
+compatible_specification_versions: 3.3.1
+vnfm_info: OSM
+
+# One block for every file in the package
+Source: native_charm_vnfd.yaml
+Algorithm: SHA-256
+Hash: ae06780c082041676df4ca4130ef223548eee6389007ba259416f59044450a7c
+
+
+
+Source: Scripts/cloud_init/cloud-config.txt
+Algorithm: SHA-256
+Hash: 0eef3f1a642339e2053af48a7e370dac1952f9cb81166e439e8f72afd6f03621
+
+# Charms files
+
+Source: Scripts/charms/simple/src/charm.py
+Algorithm: SHA-256
+Hash: ea72f897a966e6174ed9164fabc3c500df5a2f712eb6b22ab2408afb07d04d14
+
+Source: Scripts/charms/simple/hooks/start
+Algorithm: SHA-256
+Hash: 312490afd82cc86ad823e4d9e2bb9d0197f41619165dde6cf205c974f9aa86ae
+
+Source: Scripts/charms/simple/hooks/install
+Algorithm: SHA-256
+Hash: 312490afd82cc86ad823e4d9e2bb9d0197f41619165dde6cf205c974f9aa86ae
+
+Source: Scripts/charms/simple/actions.yaml
+Algorithm: SHA-256
+Hash: 988ca2653ae6a3977149faaebd664a12858e0025f226b27d2cee1fa954c9462d
+
+Source: Scripts/charms/simple/metadata.yaml
+Algorithm: SHA-256
+Hash: e00cfaf41a518aef0f486e4ae04a5ae19feffa774abfbdb68379bb5b5b102479
+
+Source: Scripts/charms/simple/config.yaml
+Algorithm: SHA-256
+Hash: f5cbf31b9c299504f3b577417b6c82bde5e3eafd74ee11fdeecf8c8bff6cf3e2
+
+
+# And on and on

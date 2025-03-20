@@ -1,0 +1,63 @@
+{
+  "provisioners": [
+    {
+      "type": "shell",
+      "script": "scripts/get-install-osm.sh",
+      "execute_command": "{{.Path}} {{user `osm_install_options`}}"
+    },
+    {
+      "type": "shell",
+      "execute_command": "echo 'vagrant' | {{.Vars}} sudo -S -E bash '{{.Path}}'",
+      "script": "scripts/vimemu.sh"
+    },
+    {
+      "type": "shell",
+      "execute_command": "echo 'vagrant' | {{.Vars}} sudo -S -E bash '{{.Path}}'",
+      "script": "scripts/cleanup.sh"
+    }
+  ],
+  "variables": {
+    "osm_install_options": "--vimemu",
+    "input_ovf": "output-virtualbox-iso/packer-ubuntu-16.04-amd64-juju.ovf",
+    "vm_name": "xenial-osm",
+    "build_dir": "osm-{{timestamp}}"
+  },
+  "builders": [
+    {
+      "type": "virtualbox-ovf",
+      "source_path": "{{user `input_ovf`}}",
+      "headless": true,
+      "ssh_username": "vagrant",
+      "ssh_password": "vagrant",
+      "ssh_port": 22,
+      "ssh_wait_timeout": "10000s",
+      "shutdown_command": "echo 'vagrant'|sudo -S shutdown -P now",
+      "virtualbox_version_file": ".vbox_version",
+      "vm_name": "{{user `vm_name`}}",
+      "output_directory": "{{user `build_dir`}}",
+      "vboxmanage": [
+        [
+          "modifyvm",
+          "{{.Name}}",
+          "--memory",
+          "4096"
+        ],
+        [
+          "modifyvm",
+          "{{.Name}}",
+          "--cpus",
+          "2"
+        ]
+      ]
+    }
+  ],
+  "post-processors": [
+    [
+      {
+	"output": "{{user `build_dir`}}/{{.Provider}}-osm.box",
+	"type": "vagrant",
+	"keep_input_artifact": true
+      }
+    ]
+  ]
+}

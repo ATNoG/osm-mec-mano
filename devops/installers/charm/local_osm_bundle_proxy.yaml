@@ -1,0 +1,200 @@
+# Copyright 2020 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+#     Unless required by applicable law or agreed to in writing, software
+#     distributed under the License is distributed on an "AS IS" BASIS,
+#     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#     See the License for the specific language governing permissions and
+#     limitations under the License.
+description: Single instance OSM bundle
+bundle: kubernetes
+variables:
+  proxy: &proxy http://91.189.89.11:3128
+  no-proxy: &no_proxy 127.0.0.1,localhost,::1,10.131.15.1/24,10.152.183.0/24,10.1.0.0/16
+applications:
+  zookeeper-k8s:
+    charm: "cs:~charmed-osm/zookeeper-k8s"
+    channel: "stable"
+    scale: 1
+    series: kubernetes
+    storage:
+      database: 100M
+    annotations:
+      gui-x: 0
+      gui-y: 550
+  mariadb-k8s:
+    charm: "cs:~charmed-osm/mariadb-k8s"
+    channel: "stable"
+    scale: 1
+    series: kubernetes
+    storage:
+      database: 50M
+    options:
+      password: manopw
+      root_password: osm4u
+      user: mano
+    annotations:
+      gui-x: -250
+      gui-y: -200
+  kafka-k8s:
+    charm: "cs:~charmed-osm/kafka-k8s"
+    channel: "stable"
+    scale: 1
+    series: kubernetes
+    storage:
+      database: 100M
+    annotations:
+      gui-x: 0
+      gui-y: 300
+  mongodb-k8s:
+    charm: "cs:~charmed-osm/mongodb-k8s"
+    channel: "stable"
+    scale: 1
+    series: kubernetes
+    storage:
+      database: 50M
+    options:
+      replica-set: rs0
+      namespace: osm
+      enable-sidecar: true
+    annotations:
+      gui-x: 0
+      gui-y: 50
+  nbi:
+    charm: "./nbi/build"
+    scale: 1
+    series: kubernetes
+    options:
+      database_commonkey: osm
+      auth_backend: keystone
+    annotations:
+      gui-x: 0
+      gui-y: -200
+  ro:
+    charm: "./ro/build"
+    scale: 1
+    series: kubernetes
+    annotations:
+      gui-x: -250
+      gui-y: 300
+  ng-ui:
+    charm: "./ng-ui/build"
+    scale: 1
+    series: kubernetes
+    annotations:
+      gui-x: 500
+      gui-y: 100
+  lcm:
+    charm: "./lcm/build"
+    scale: 1
+    series: kubernetes
+    options:
+      database_commonkey: osm
+      vca_model_config_no_proxy: *no_proxy
+      vca_model_config_juju_no_proxy: *no_proxy
+      vca_model_config_apt_no_proxy: *no_proxy
+      vca_model_config_juju_http_proxy: *proxy
+      vca_model_config_juju_https_proxy: *proxy
+      vca_model_config_apt_http_proxy: *proxy
+      vca_model_config_apt_https_proxy: *proxy
+      vca_model_config_snap_http_proxy: *proxy
+      vca_model_config_snap_https_proxy: *proxy
+    annotations:
+      gui-x: -250
+      gui-y: 50
+  mon:
+    charm: "./mon/build"
+    scale: 1
+    series: kubernetes
+    options:
+      database_commonkey: osm
+    annotations:
+      gui-x: 250
+      gui-y: 50
+  pol:
+    charm: "./pol/build"
+    scale: 1
+    series: kubernetes
+    annotations:
+      gui-x: -250
+      gui-y: 550
+  pla:
+    charm: "./pla/build"
+    scale: 1
+    series: kubernetes
+    annotations:
+      gui-x: 500
+      gui-y: -200
+  prometheus:
+    charm: "./prometheus/build"
+    channel: "stable"
+    scale: 1
+    series: kubernetes
+    storage:
+      data: 50M
+    options:
+      default-target: "mon:8000"
+    annotations:
+      gui-x: 250
+      gui-y: 300
+  grafana:
+    charm: "./grafana/build"
+    channel: "stable"
+    scale: 1
+    series: kubernetes
+    annotations:
+      gui-x: 250
+      gui-y: 550
+  keystone:
+    charm: "./keystone/build"
+    scale: 1
+    series: kubernetes
+    annotations:
+      gui-x: -250
+      gui-y: 550
+relations:
+  - - grafana:prometheus
+    - prometheus:prometheus
+  - - kafka-k8s:zookeeper
+    - zookeeper-k8s:zookeeper
+  - - keystone:db
+    - mariadb-k8s:mysql
+  - - lcm:kafka
+    - kafka-k8s:kafka
+  - - lcm:mongodb
+    - mongodb-k8s:mongo
+  - - ro:ro
+    - lcm:ro
+  - - ro:kafka
+    - kafka-k8s:kafka
+  - - ro:mongodb
+    - mongodb-k8s:mongo
+  - - pol:kafka
+    - kafka-k8s:kafka
+  - - pol:mongodb
+    - mongodb-k8s:mongo
+  - - mon:mongodb
+    - mongodb-k8s:mongo
+  - - mon:kafka
+    - kafka-k8s:kafka
+  - - pla:kafka
+    - kafka-k8s:kafka
+  - - pla:mongodb
+    - mongodb-k8s:mongo
+  - - nbi:mongodb
+    - mongodb-k8s:mongo
+  - - nbi:kafka
+    - kafka-k8s:kafka
+  - - nbi:prometheus
+    - prometheus:prometheus
+  - - nbi:keystone
+    - keystone:keystone
+  - - mon:prometheus
+    - prometheus:prometheus
+  - - ng-ui:nbi
+    - nbi:nbi

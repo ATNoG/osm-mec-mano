@@ -1,0 +1,120 @@
+#######################################################################################
+# Copyright ETSI Contributors and Others.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#######################################################################################
+
+# Retrieves Gitea connection info data
+
+# Helper function to monitor progress of a condition
+function monitor_condition() {
+    local CONDITION="$1"        # Function with the condition
+    local MESSAGE="${2:-}"      # Message during each check
+    local TIMEOUT="${3:-300}"   # Timeout, in seconds (default: 5 minutes)
+    local STEP="${4:-2}"        # Polling period (default: 2 seconds)
+
+    until "${CONDITION}" || [ ${TIMEOUT} -le 0 ]
+    do
+        echo -en "${MESSAGE}"
+
+        ((TIMEOUT-=${STEP}))
+
+        sleep "${STEP}"
+    done
+
+    "${CONDITION}"
+}
+
+# Check that the IP associated to the Ingress service is available
+function ingress_service_ip_available() {
+    kubectl get svc/ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}' > /dev/null
+}
+
+# Wait until the IP associated to the Ingress service is available
+function wait_until_ingress_service_ip_available() {
+    monitor_condition ingress_service_ip_available "External IP address for Ingress not ready yet...\n" 300 5
+    if [[ $? -ne 0 ]]
+    then
+        echo -e "\nFATAL: Timeout waiting for external IP address for Ingress to be ready. ABORTED.\n"
+        exit 1
+    fi
+}
+
+# Internal services and ports
+export GITEA_INTERNAL_HTTP_IP=gitea-http.gitea
+export GITEA_INTERNAL_SSH_IP=gitea-ssh.gitea
+export GITEA_HTTP_PORT=$(kubectl get svc/gitea-http -n gitea -o jsonpath='{.spec.ports[0].port}')
+export GITEA_SSH_PORT=$(kubectl get svc/gitea-ssh -n gitea -o jsonpath='{.spec.ports[0].port}')
+
+# If applicable, gets recommended service IP addresses
+## SSH service
+if [[ -n $(kubectl get svc/gitea-ssh -n gitea -o jsonpath='{.status.loadBalancer.ingress[0].ip}') ]]
+then
+    # Retrieves the external IP address
+    export GITEA_SSH_IP=$(kubectl get svc/gitea-ssh -n gitea -o jsonpath='{.status.loadBalancer.ingress[0].ip}') || true
+else
+    # Otherwise just uses the internal service name
+    export GITEA_SSH_IP=${GITEA_INTERNAL_SSH_IP}
+fi
+## HTTP service
+if [[ -n $(kubectl get svc/gitea-http -n gitea -o jsonpath='{.status.loadBalancer.ingress[0].ip}') ]]
+then
+    # Retrieves the external IP addresses (if it exists)
+    export GITEA_HTTP_IP=$(kubectl get svc/gitea-http -n gitea -o jsonpath='{.status.loadBalancer.ingress[0].ip}') || true
+# In case it is behind an Ingress
+elif  [[ -n $(kubectl get ingress/gitea -n gitea 2> /dev/null) ]]
+then
+    # Waits until the external IP address is available
+    echo "Waiting until the Ingress service IP address is available..."
+    wait_until_ingress_service_ip_available
+
+    # Retrieves the external IP address of the Ingress service
+    export GITEA_HTTP_IP=$(kubectl get svc/ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}') || true
+    echo "Got it: ${GITEA_HTTP_IP}"
+else
+    # Otherwise just uses the internal service name
+    export GITEA_HTTP_IP=${GITEA_INTERNAL_HTTP_IP}
+fi
+
+# Applicable URLs
+export GITEA_HTTP_HOST_DOMAIN="git.${GITEA_HTTP_IP}.nip.io"
+export GITEA_HTTP_URL="http://git.${GITEA_HTTP_IP}.nip.io"
+export GITEA_SSH_URL="git.${GITEA_SSH_IP}.nip.io"
+export GITEA_INTERNAL_HTTP_URL="http://${GITEA_INTERNAL_HTTP_IP}"
+export GITEA_INTERNAL_SSH_URL="${GITEA_INTERNAL_SSH_IP}"
+
+# Add explicit ports if required
+if [[ "${GITEA_HTTP_PORT}" != 80 ]]
+then
+    export GITEA_INTERNAL_HTTP_URL="${GITEA_INTERNAL_HTTP_URL}:${GITEA_HTTP_PORT}"
+
+    # If it is not behind an Ingress, the port will be the original one, not necessarily 80
+    if [[ -z $(kubectl get ingress/gitea -n gitea 2> /dev/null) ]]
+    then
+        export GITEA_HTTP_URL="${GITEA_HTTP_URL}:${GITEA_HTTP_PORT}"
+    fi
+fi
+
+# Add port to SSH URL if needed
+export GITEA_SSH_SERVER="${GITEA_SSH_URL}"
+export GITEA_INTERNAL_SSH_SERVER="${GITEA_INTERNAL_SSH_URL}"
+if [[ "${GITEA_SSH_PORT}" != 22 ]]
+then
+    export GITEA_SSH_URL="${GITEA_SSH_URL}:${GITEA_SSH_PORT}"
+    export GITEA_INTERNAL_SSH_URL="${GITEA_INTERNAL_SSH_URL}:${GITEA_SSH_PORT}"
+fi
+
+# Complete the SSH URLs to avoid ambiguity
+export GITEA_SSH_URL="ssh://git@${GITEA_SSH_URL}"
+export GITEA_INTERNAL_SSH_URL="ssh://git@${GITEA_INTERNAL_SSH_URL}"

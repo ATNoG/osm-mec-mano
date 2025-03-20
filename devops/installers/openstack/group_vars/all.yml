@@ -1,0 +1,53 @@
+---
+
+#   Copyright 2020 British Telecommunications plc
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#   Author: Antonio Marsico (antonio.marsico@bt.com)
+
+osm_installer_path: /usr/share/osm-devops/installers/install_osm.sh
+
+server_name: server-osm
+
+cloud_name:
+
+setup_volume: false
+
+external_network_name:
+
+installer_args:
+
+userdata_file:
+
+local_userdata:
+
+os_key_name: osm-ansible-key
+
+key_file:
+
+os_flavor:
+  name: medium-4-cpu-8-gb-40-disk
+  cpu: 4
+  ram: 8192
+  disk: 40
+
+servers:
+  - name: '1'
+    user: ubuntu
+    image: ubuntu1804
+    image_url: https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img
+    flavor: "{{os_flavor.name}}"
+    key: "{{os_key_name}}"
+    nics: "net-name={{external_network_name}}"
+    meta:
+      group: appservers

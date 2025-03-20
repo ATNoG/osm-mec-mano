@@ -1,0 +1,78 @@
+---
+#   Copyright 2020 British Telecommunications plc
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#   Author: Antonio Marsico (antonio.marsico@bt.com)
+
+- set_fact:
+    local_userdata: "{{ lookup('file', userdata_file) }}"
+  when: userdata_file != none
+
+- name: Launch OSM instances
+  openstack.cloud.server:
+    cloud: "{{ cloud_name }}"
+    name: "{{ server_name }}-{{ item.name }}"
+    state: present
+    key_name: "{{ item.key }}"
+    nics: "{{ item.nics }}"
+    image: "{{ item.image }}"
+    flavor: "{{ item.flavor }}"
+    userdata: "{{ local_userdata }}"
+    security_groups:
+      - default
+      - "{{external_network_name}}_access"
+  with_items: "{{ servers }}"
+  register: "os_hosts"
+  when: setup_volume|bool == False
+
+- name: Launch OSM instances with a volume
+  openstack.cloud.server:
+    cloud: "{{ cloud_name }}"
+    name: "{{ server_name }}-{{ item.name }}"
+    state: present
+    key_name: "{{ item.key }}"
+    nics: "{{ item.nics }}"
+    image: "{{ item.image }}"
+    flavor: "{{ item.flavor }}"
+    volume_size: "{{ os_flavor.disk }}"
+    userdata: "{{ local_userdata }}"
+    boot_from_volume: yes
+    terminate_volume: yes
+    security_groups:
+      - default
+      - "{{external_network_name}}_access"
+  with_items: "{{ servers }}"
+  register: "os_hosts_with_volume"
+  when: setup_volume|bool == True
+
+- set_fact:
+    os_hosts: "{{ os_hosts_with_volume }}"
+  when: setup_volume|bool == True
+
+- name: Add OSM host to the local Ansible inventory
+  add_host:
+    name: "{{ item.openstack.accessIPv4 }}"
+    groups: "{{ item['item']['meta']['group'] }}"
+    ansible_private_key_file: "~/.ssh/{{ os_key_name }}"
+    ansible_user: "{{ item['item']['user'] }}"
+  with_items: "{{ os_hosts.results }}"
+  when: key_file == none
+
+- name: Add OSM host to the local Ansible inventory
+  add_host:
+    name: "{{ item.openstack.accessIPv4 }}"
+    groups: "{{ item['item']['meta']['group'] }}"
+    ansible_private_key_file: "{{ key_file | regex_replace('.pub') }}"
+    ansible_user: "{{ item['item']['user'] }}"
+  with_items: "{{ os_hosts.results }}"
+  when: key_file != none

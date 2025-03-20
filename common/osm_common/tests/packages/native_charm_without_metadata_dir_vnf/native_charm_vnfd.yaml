@@ -1,0 +1,103 @@
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+#
+
+metadata:
+  template_name: native_charm-vnf
+  template_author: AFA
+  template_version: 1.1
+
+vnfd:
+  description: A VNF consisting of 1 VDU connected to two external VL, and one for
+    data and another one for management
+  df:
+  - id: default-df
+    instantiation-level:
+    - id: default-instantiation-level
+      vdu-level:
+      - number-of-instances: 1
+        vdu-id: mgmtVM
+    vdu-profile:
+    - id: mgmtVM
+      min-number-of-instances: 1
+      vdu-configuration-id: mgmtVM-vdu-configuration
+  ext-cpd:
+  - id: vnf-mgmt-ext
+    int-cpd:
+      cpd: mgmtVM-eth0-int
+      vdu-id: mgmtVM
+  - id: vnf-data-ext
+    int-cpd:
+      cpd: dataVM-xe0-int
+      vdu-id: mgmtVM
+  id: native_charm-vnf
+  mgmt-cp: vnf-mgmt-ext
+  product-name: native_charm-vnf
+  provider: AFA
+  sw-image-desc:
+  - id: ubuntu18.04
+    image: ubuntu18.04
+    name: ubuntu18.04
+  vdu:
+  - cloud-init-file: cloud-config.txt
+    id: mgmtVM
+    int-cpd:
+    - id: mgmtVM-eth0-int
+      virtual-network-interface-requirement:
+      - name: mgmtVM-eth0
+        position: 1
+        virtual-interface:
+          type: PARAVIRT
+    - id: dataVM-xe0-int
+      virtual-network-interface-requirement:
+      - name: dataVM-xe0
+        position: 2
+        virtual-interface:
+          type: PARAVIRT
+    name: mgmtVM
+    sw-image-desc: ubuntu18.04
+    virtual-compute-desc: mgmtVM-compute
+    virtual-storage-desc:
+    - mgmtVM-storage
+  vdu-configuration:
+  - config-access:
+      ssh-access:
+        default-user: ubuntu
+        required: true
+    config-primitive:
+    - name: touch
+      parameter:
+      - data-type: STRING
+        default-value: /home/ubuntu/touched
+        name: filename
+    id: mgmtVM-vdu-configuration
+    initial-config-primitive:
+    - name: touch
+      parameter:
+      - data-type: STRING
+        name: filename
+        value: /home/ubuntu/first-touch
+      seq: 1
+    juju:
+      charm: simple
+      proxy: false
+  version: 1.0
+  virtual-compute-desc:
+  - id: mgmtVM-compute
+    virtual-cpu:
+      num-virtual-cpu: 1
+    virtual-memory:
+      size: 1.0
+  virtual-storage-desc:
+  - id: mgmtVM-storage
+    size-of-storage: 10

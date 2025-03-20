@@ -1,0 +1,50 @@
+# Copyright 2022 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+#
+# For those usages not covered by the Apache License, Version 2.0 please
+# contact: legal@canonical.com
+#
+# To get in touch with the maintainers, please contact:
+# osm-charmers@lists.launchpad.net
+#
+#
+# This file populates the Configure tab on Charmhub.
+# See https://juju.is/docs/some-url-to-be-determined/ for a checklist and guidance.
+
+options:
+  # Ingress options
+  external-hostname:
+    default: ""
+    description: |
+      The url that will be configured in the Kubernetes ingress.
+
+      The easiest way of configuring the external-hostname without having the DNS setup is by using
+      a Wildcard DNS like nip.io constructing the url like so:
+        - ng-ui.127.0.0.1.nip.io (valid within the K8s cluster node)
+        - ng-ui.<k8s-worker-ip>.nip.io (valid from outside the K8s cluster node)
+
+      This option is only applicable when the Kubernetes cluster has nginx ingress configured
+      and the charm is related to the nginx-ingress-integrator.
+      See more: https://charmhub.io/nginx-ingress-integrator
+    type: string
+  max-body-size:
+    default: 20
+    description: Max allowed body-size (for file uploads) in megabytes, set to 0 to
+      disable limits.
+    source: default
+    type: int
+    value: 20
+  tls-secret-name:
+    description: TLS secret name to use for ingress.
+    type: string

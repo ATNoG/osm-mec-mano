@@ -1,0 +1,56 @@
+---
+#   Copyright 2020 British Telecommunications plc
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#   Author: Antonio Marsico (antonio.marsico@bt.com)
+
+- name: Waiting target connection to become reachable/usable
+  wait_for_connection:
+
+- name: Gathering facts
+  setup:
+
+- name: Copy OSM installer
+  copy:
+    src: "{{ osm_installer_path }}"
+    dest: install_osm.sh
+    mode: '744'
+
+- name: Check OSM reachability
+  uri:
+    url: http://localhost
+  ignore_errors: yes
+  register: curl_result
+
+- debug:
+    var: installer_args
+    verbosity: 2
+
+- name: Install and configure OSM (It may require 10 min or more!)
+  shell:
+    cmd: ./install_osm.sh -y {{installer_args}} 2>&1 | tee osm_install_log.txt
+  args:
+    executable: /bin/bash
+  register: osm_installation_results
+  environment:
+    PATH: "/snap/bin:{{ ansible_env.PATH }}"
+  when: curl_result is failed
+
+- debug:
+    var: osm_installation_results
+    verbosity: 2
+
+- name: Check OSM reachability
+  uri:
+    url: http://localhost
+  register: curl_result

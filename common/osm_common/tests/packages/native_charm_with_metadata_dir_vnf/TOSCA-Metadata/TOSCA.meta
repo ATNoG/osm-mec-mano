@@ -1,0 +1,31 @@
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+#
+# For those usages not covered by the Apache License, Version 2.0 please
+# contact: agarcia@whitestack.com
+##
+
+TOSCA-Meta-Version: 1.0
+CSAR-Version: 1.0
+Created-By: Diego Armando Maradona
+Entry-Definitions: Definitions/native_charm_vnfd.yaml # Points to the main descriptor of the package
+ETSI-Entry-Manifest: manifest.mf # Points to the ETSI manifest file
+ETSI-Entry-Change-Log: Files/Changelog.txt # Points to package changelog
+ETSI-Entry-Licenses: Files/Licenses # Points to package licenses folder
+
+# In principle, we could add one block per package file to specify MIME types
+Name: Definitions/native_charm_vnfd.yaml            # path to file within package
+Content-Type: application/yaml                      # MIME type of file
+
+Name: Scripts/cloud_init/cloud-config.txt
+Content-Type: application/yaml
