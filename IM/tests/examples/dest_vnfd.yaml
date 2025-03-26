@@ -1,0 +1,79 @@
+#  Copyright ETSI Contributors and Others
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+#  implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+vnfd:
+    description: Destination vnf descriptor
+    df:
+    - id: default-df
+      instantiation-level:
+      - id: default-instantiation-level
+        vdu-level:
+        - number-of-instances: 1
+          vdu-id: dest_vnf-VM
+      vdu-profile:
+      - id: dest_vnf-VM
+        min-number-of-instances: 1
+    ext-cpd:
+    - id: eth0-ext
+      int-cpd:
+        cpd: eth0-int
+        vdu-id: dest_vnf-VM
+    id: dest_vnf
+    mgmt-cp: eth0-ext
+    product-name: dest_vnf
+    provider: OSM
+    sw-image-desc:
+    - id: bionic
+      image: bionic
+      name: bionic
+    - id: ubuntu20.04-aws
+      name: ubuntu20.04-aws
+      image: ubuntu/images/hvm-ssd/ubuntu-artful-17.10-amd64-server-20180509
+      vim-type: aws
+    - id: ubuntu20.04-azure
+      name: ubuntu20.04-azure
+      image: Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest
+      vim-type: azure
+    vdu:
+    - id: dest_vnf-VM
+      cloud-init-file: cloud-config
+      description: dest_vnf-VM
+      int-cpd:
+      - id: eth0-int
+        virtual-network-interface-requirement:
+        - name: eth0
+          virtual-interface:
+            bandwidth: 0
+            type: VIRTIO
+            vpci: 0000:00:0a.0
+      name: dest_vnf-VM
+      sw-image-desc: bionic
+      alternative-sw-image-desc:
+      - ubuntu20.04-aws
+      - ubuntu20.04-azure
+      virtual-compute-desc: dest_vnf-VM-compute
+      virtual-storage-desc:
+      - dest_vnf-VM-storage
+    version: '1.0'
+    software-version: 1.2
+    virtual-compute-desc:
+    - id: dest_vnf-VM-compute
+      virtual-cpu:
+        num-virtual-cpu: 1
+      virtual-memory:
+        size: 2
+    virtual-storage-desc:
+    - id: dest_vnf-VM-storage
+      size-of-storage: 10

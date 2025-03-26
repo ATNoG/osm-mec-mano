@@ -1,0 +1,86 @@
+#
+# Copyright 2019 Whitestack LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+--- /tmp/sol006_model/src/yang/etsi-nfv-ns.yang	2019-12-04 13:56:05.510072421 +0000
++++ /tmp/sol006_model/src/yang/etsi-nfv-ns_new.yang	2019-12-04 13:59:32.675856579 +0000
+@@ -434,8 +434,8 @@
+           mandatory "true";
+           container vnf-profile {
+             leaf vnf-profile-id {
+-              must ". = deref(../../vnfd-profile-id)" {
+-              }
++              // must ". = deref(../../vnfd-profile-id)" {
++              // }
+               type leafref {
+                 path "../../../../../nsd/df/vnf-profile/id";
+               }
+@@ -443,8 +443,8 @@
+           }
+           container pnf-profile {
+             leaf pnf-profile-id {
+-              must ". = deref(../../pnfd-profile-id)" {
+-              }
++              // must ". = deref(../../pnfd-profile-id)" {
++              // }
+               type leafref {
+                 path "../../../../../nsd/df/pnf-profile/id";
+               }
+@@ -452,8 +452,8 @@
+           }
+           container ns-profile {
+             leaf ns-profile-id {
+-              must ". = deref(../../ns-profile-id)" {
+-              }
++              // must ". = deref(../../ns-profile-id)" {
++              // }
+               type leafref {
+                 path "../../../../../nsd/df/ns-profile/id";
+               }
+@@ -469,8 +469,8 @@
+         choice constituent-cpd-id {
+           container vnf {
+             leaf vnfd-id {
+-              must ". = deref(../../vnfd-profile-id)/../vnfd-id" {
+-              }
++              // must ". = deref(../../vnfd-profile-id)/../vnfd-id" {
++              // }
+               type leafref {
+                 path "../../../../../vnfd/id";
+               }
+@@ -483,8 +483,8 @@
+           }
+           container pnf {
+             leaf pnfd-id {
+-              must ". = deref(../../pnfd-profile-id)/../pnfd-id" {
+-              }
++              // must ". = deref(../../pnfd-profile-id)/../pnfd-id" {
++              // }
+               type leafref {
+                 path "../../../../../pnfd/id";
+               }
+@@ -497,9 +497,9 @@
+           }
+           container ns {
+             leaf nsd-id {
+-              must ". = deref(../../nested-ns-profile-id)/" +
+-                   "../nsd-id" {
+-              }
++              // must ". = deref(../../nested-ns-profile-id)/" +
++              //      "../nsd-id" {
++              // }
+ 
+               type leafref {
+                 path "../../../../../nsd/id";

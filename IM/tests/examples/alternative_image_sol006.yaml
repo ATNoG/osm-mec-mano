@@ -1,0 +1,74 @@
+#  Copyright 2020 Whitestack LLC
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+#  implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+vnfd:
+  id: hackfest_basic-vnf
+  product-name: hackfest_basic-vnf
+  description: A basic VNF descriptor w/ one VDU
+  version: "1.0"
+  mgmt-cp: vnf-cp0-ext
+
+  virtual-compute-desc:
+    - id: hackfest_basic-VM-compute
+      virtual-cpu:
+        num-virtual-cpu: 1
+      virtual-memory:
+        size: 1 # Memory size in GB
+
+  virtual-storage-desc:
+    - id: hackfest_basic-VM-storage
+      size-of-storage: 10
+
+  sw-image-desc:
+    - id: ubuntu1604
+      name: ubuntu1604
+      image: ubuntu1604
+    - id: ubuntu/images/hvm-ssd/ubuntu-artful-17.10-amd64-server-20180509
+      name: ubuntu/images/hvm-ssd/ubuntu-artful-17.10-amd64-server-20180509
+      image: ubuntu/images/hvm-ssd/ubuntu-artful-17.10-amd64-server-20180509
+      vim-type: aws
+
+  vdu:
+    - id: hackfest_basic-VM
+      name: hackfest_basic-VM
+      virtual-compute-desc: hackfest_basic-VM-compute
+      virtual-storage-desc:
+        - hackfest_basic-VM-storage
+      sw-image-desc: ubuntu1604
+      alternative-sw-image-desc:
+        - ubuntu/images/hvm-ssd/ubuntu-artful-17.10-amd64-server-20180509
+      int-cpd:
+        - id: vdu-eth0-int
+          virtual-network-interface-requirement:
+            - name: vdu-eth0
+              virtual-interface:
+                type: PARAVIRT
+
+  df:
+    - id: default-df
+      vdu-profile:
+        - id: hackfest_basic-VM
+          min-number-of-instances: 1
+      instantiation-level:
+        - id: default-instantiation-level
+          vdu-level:
+            - vdu-id: hackfest_basic-VM
+              number-of-instances: 1
+
+  ext-cpd:
+    - id: vnf-cp0-ext
+      int-cpd: # Connection to int-cpd
+        vdu-id: hackfest_basic-VM
+        cpd: vdu-eth0-int

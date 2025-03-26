@@ -1,0 +1,65 @@
+/*
+  Copyright 2020 Whitestack LLC
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+  implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+module ns-various {
+    yang-version 1.1;
+    namespace "urn:etsi:osm:yang:augments:ns-various";
+    prefix "ns-various";
+
+    import etsi-nfv-nsd {
+        prefix nsd;
+    }
+
+    import ip-profiles {
+        prefix ip-profiles;
+    }
+
+    import common-augments {
+        prefix common;
+    }
+
+    grouping extended-floating-ip {
+        leaf floating-ip-required {
+            description
+              "Boolean parameter to indicate whether the CP must be exposed.
+               A public IP address will be allocated to this CP if exposed is true.
+               The default is false meaning a floating IP address is not required.
+               It must be explicitly asked for a floating IP address to be allocated.";
+            type boolean;
+        }
+    }
+
+    grouping extended-security-group {
+        leaf security-group {
+            description
+              "Name of the security group";
+            type string;
+        }
+    }
+
+    augment "/nsd:nsd/nsd:nsd" {
+        uses common:description;
+    }
+
+    augment "/nsd:nsd/nsd:nsd/nsd:sapd" {
+        uses extended-floating-ip;
+    }
+
+    augment "/nsd:nsd/nsd:nsd/nsd:df/nsd:virtual-link-profile/ip-profiles:virtual-link-protocol-data/ip-profiles:l3-protocol-data" {
+        uses extended-security-group;
+    }
+}

@@ -1,0 +1,72 @@
+#  Copyright 2020 Whitestack LLC
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+#  implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+vnfd:
+  id: native_k8s_charm-vnf
+  product-name: native_k8s_charm-vnf
+  version: "1.0"
+  mgmt-cp: mgmt-ext
+
+  kdu:
+    - name: wordpress-kdu
+      juju-bundle: bundle.yaml
+
+  df:
+    - id: default-df
+      kdu-resource-profile:
+        - id: mysql-scale
+          kdu-name: wordpress-kdu
+          resource-name: mysql
+          min-number-of-instances: 1
+        - id: nginx-scale
+          kdu-name: wordpress-kdu
+          resource-name: nginx
+          min-number-of-instances: 1
+          max-number-of-instances: 11
+      scaling-aspect:
+        - id: scale_wordpresskdu
+          name: scale_wordpresskdu
+          max-scale-level: 10
+          aspect-delta-details:
+            deltas:
+              - id: wordpress-kdu
+                kdu-resource-delta:
+                  - id: mysql-scale
+                    number-of-instances: 2
+                  - id: nginx-scale
+                    number-of-instances: 1
+      lcm-operations-configuration:
+        operate-vnf-op-config:
+          day1-2:
+            - id: wordpress-kdu
+              config-primitive:
+                - name: changecontent
+                  parameter:
+                    - data-type: STRING
+                      default-value: nginx
+                      name: application-name
+                    - data-type: STRING
+                      default-value: ""
+                      name: customtitle
+              initial-config-primitive:
+                - name: changecontent
+                  parameter:
+                    - data-type: STRING
+                      name: application-name
+                      value: nginx
+                    - data-type: STRING
+                      name: customtitle
+                      value: Initial Config Primitive
+                  seq: 1

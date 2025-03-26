@@ -1,0 +1,68 @@
+/*
+  Copyright 2020 Whitestack LLC
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+  implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+module interface {
+    yang-version 1.1;
+    namespace "urn:etsi:osm:yang:augments:interface";
+    prefix "interface";
+
+    import etsi-nfv-vnfd {
+        prefix vnfd;
+    }
+
+    import ietf-inet-types {
+        prefix inet;
+    }
+
+    import common-augments {
+        prefix common;
+    }
+
+    grouping extended-interface {
+        description
+          "List of Interfaces (external and internal) for the VNF";
+
+        leaf position {
+            description
+              "Explicit Position of the interface within the list";
+            type uint32;
+        }
+
+        leaf ip-address {
+            description
+              "IP address of the internal connection point";
+            type inet:ip-address;
+          }
+
+        leaf mac-address {
+            description
+              "MAC address of the interface.
+               Some VNFs require a specific MAC address to be configured
+               in the interface. While this is not recommended at all in
+               NFV environments, this parameter exists to allow those
+               scenarios.
+               This parameter will be likely deprecated in the future.";
+            type string;
+        }
+
+        uses common:virtual-interface;
+    }
+
+    augment "/vnfd:vnfd/vnfd:vdu/vnfd:int-cpd/vnfd:virtual-network-interface-requirement" {
+        uses extended-interface;
+    }
+}

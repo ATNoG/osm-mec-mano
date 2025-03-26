@@ -1,0 +1,176 @@
+#  Copyright 2020 Whitestack LLC
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+#  implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+vnfd:
+  id: vbng34
+  description: vBNG VNF for performance tests, with 34 HTs
+  product-name: vbng34
+  provider: Intel
+  version: "1.0"
+  mgmt-cp: eth0-ext
+  sw-image-desc:
+    - id: intel_vbng34
+      name: intel_vbng34
+      image: intel_vbng34
+  virtual-compute-desc:
+    - id: vbng34-VM-compute
+      virtual-cpu:
+        pinning: # Generic key/value pairs
+          policy: static
+          thread-policy: PREFER
+      virtual-memory:
+        size: 32.0
+        mempage-size: LARGE
+        numa-enabled: true # Replaces NUMA aware/unaware choice
+        numa-node-policy:
+          mem-policy: STRICT
+          node:
+            - id: "0"
+              paired-threads:
+                num-paired-threads: "17"
+          node-cnt: "1"
+  virtual-storage-desc:
+    - id: vbng34-VM-storage
+      size-of-storage: 15
+  vdu:
+    - id: vbng34-VM
+      name: vbng34-VM
+      description: vbng34-VM
+      sw-image-desc: intel_vbng34
+      virtual-compute-desc: vbng34-VM-compute
+      virtual-storage-desc:
+        - vbng34-VM-storage
+      int-cpd:
+        - id: eth0-int
+          virtual-network-interface-requirement:
+            - name: eth0
+              position: 1
+              virtual-interface:
+                type: PARAVIRT
+                bandwidth: "1000000"
+                vpci: "0000:00:0a.0"
+        - id: xe0-int
+          virtual-network-interface-requirement:
+            - name: xe0
+              position: 2
+              virtual-interface:
+                type: PCI-PASSTHROUGH
+                bandwidth: "10000000000"
+                vpci: "0000:00:10.0"
+        - id: xe1-int
+          virtual-network-interface-requirement:
+            - name: xe1
+              position: 3
+              virtual-interface:
+                type: PCI-PASSTHROUGH
+                bandwidth: "10000000000"
+                vpci: "0000:00:11.0"
+        - id: xe2-int
+          virtual-network-interface-requirement:
+            - name: xe2
+              position: 4
+              virtual-interface:
+                type: PCI-PASSTHROUGH
+                bandwidth: "10000000000"
+                vpci: "0000:00:12.0"
+        - id: xe3-int
+          virtual-network-interface-requirement:
+            - name: xe3
+              position: 5
+              virtual-interface:
+                type: PCI-PASSTHROUGH
+                bandwidth: "10000000000"
+                vpci: "0000:00:13.0"
+        - id: xe4-int
+          virtual-network-interface-requirement:
+            - name: xe4
+              position: 6
+              virtual-interface:
+                type: PCI-PASSTHROUGH
+                bandwidth: "10000000000"
+                vpci: "0000:00:14.0"
+        - id: xe5-int
+          virtual-network-interface-requirement:
+            - name: xe5
+              position: 7
+              virtual-interface:
+                type: PCI-PASSTHROUGH
+                bandwidth: "10000000000"
+                vpci: "0000:00:15.0"
+        - id: xe6-int
+          virtual-network-interface-requirement:
+            - name: xe6
+              position: 8
+              virtual-interface:
+                type: PCI-PASSTHROUGH
+                bandwidth: "10000000000"
+                vpci: "0000:00:16.0"
+        - id: xe7-int
+          virtual-network-interface-requirement:
+            - name: xe7
+              position: 9
+              virtual-interface:
+                type: PCI-PASSTHROUGH
+                bandwidth: "10000000000"
+                vpci: "0000:00:17.0"
+      supplemental-boot-data:
+        boot-data-drive: "false"
+  ext-cpd:
+    - id: eth0-ext
+      int-cpd:
+        vdu-id: vbng34-VM
+        cpd: eth0-int
+    - id: xe0-ext
+      int-cpd:
+        vdu-id: vbng34-VM
+        cpd: xe0-int
+    - id: xe1-ext
+      int-cpd:
+        vdu-id: vbng34-VM
+        cpd: xe1-int
+    - id: xe2-ext
+      int-cpd:
+        vdu-id: vbng34-VM
+        cpd: xe2-int
+    - id: xe3-ext
+      int-cpd:
+        vdu-id: vbng34-VM
+        cpd: xe3-int
+    - id: xe4-ext
+      int-cpd:
+        vdu-id: vbng34-VM
+        cpd: xe4-int
+    - id: xe5-ext
+      int-cpd:
+        vdu-id: vbng34-VM
+        cpd: xe5-int
+    - id: xe6-ext
+      int-cpd:
+        vdu-id: vbng34-VM
+        cpd: xe6-int
+    - id: xe7-ext
+      int-cpd:
+        vdu-id: vbng34-VM
+        cpd: xe7-int
+  df:
+  - id: default-df
+    instantiation-level:
+    - id: default-instantiation-level
+      vdu-level:
+      - number-of-instances: 1
+        vdu-id: vbng34-VM
+    vdu-profile:
+    - id: vbng34-VM
+      min-number-of-instances: 1

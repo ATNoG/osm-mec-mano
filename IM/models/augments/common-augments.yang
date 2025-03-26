@@ -1,0 +1,794 @@
+/*
+  Copyright 2020 Whitestack LLC
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+  implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+module common-augments {
+    yang-version 1.1;
+    namespace "urn:etsi:osm:yang:augments";
+    prefix "common";
+
+    import etsi-nfv-vnfd {
+        prefix vnfd;
+    }
+    import etsi-nfv-nsd {
+        prefix nsd;
+    }
+
+    typedef parameter-data-type {
+        type enumeration {
+            enum STRING;
+            enum INTEGER;
+            enum BOOLEAN;
+        }
+    }
+
+    grouping primitive-parameter-value {
+        list parameter {
+            description
+              "List of parameters to the configuration primitive.";
+            key "name";
+            leaf name {
+                description
+                  "Name of the parameter.";
+                type string;
+            }
+
+            leaf data-type {
+                description
+                  "Data type associated with the value.";
+                type common:parameter-data-type;
+            }
+
+            leaf value {
+                description
+                  "Value associated with the name.";
+                type string;
+            }
+        }
+    }
+
+    grouping primitive-parameter {
+        leaf name {
+            description
+              "Name of the parameter.";
+            type string;
+        }
+
+        leaf data-type {
+            description
+              "Data type associated with the name.";
+            type common:parameter-data-type;
+        }
+
+        leaf mandatory {
+            description
+              "Is this field mandatory";
+            type boolean;
+            default false;
+        }
+
+        leaf default-value {
+            description
+              "The default value for this field";
+            type string;
+        }
+
+        leaf parameter-pool {
+            description
+              "NSD parameter pool name to use for this parameter";
+            type string;
+        }
+
+        leaf read-only {
+            description
+              "The value should be dimmed by the UI.
+               Only applies to parameters with default values.";
+            type boolean;
+            default false;
+        }
+
+        leaf hidden {
+            description
+              "The value should be hidden by the UI.
+               Only applies to parameters with default values.";
+            type boolean;
+            default false;
+        }
+    }
+
+    grouping relations-ee {
+        description
+          "Information about the execution environment and endpoint for a relation.
+           The execution environment can be associated to different objects: kdu, vdu, vnf, or ns.
+           To select the object, the profile-id of the object might be needed:
+            Reference to a kdu-level execution enviroment:
+                in the VNFd: the kdu-resource-profile-id is needed.
+                in the NSd: the kdu-resource-profile-id and vnf-profile-id are needed.
+            Reference to a vdu-level execution enviroment:
+                in the VNFd: the vdu-profile-id is needed.
+                in the NSd: the vdu-profile-id and vnf-profile-id are needed.
+            Reference to a vnf-level execution enviroment:
+                in the VNFd: nothing is needed, implicit.
+                in the NSd: the vnf-profile-id is needed.
+            Reference to an ns-level execution enviroment:
+                in the VNFd: cannot be done.
+                in the NSd: nothing is needed, implicit.
+           The reference to the execution environment is only mandatory if there is more than one execution environment
+           in the execution-environment-list of an object.
+           The endpoint is always needed";
+
+        leaf vdu-profile-id {
+            description
+              "If the execution environment is associated to a vdu object,
+              this parameter is the reference to the vdu-profile id.";
+            type leafref {
+                path "/vnfd:vnfd/vnfd:df/vnfd:vdu-profile/vnfd:id";
+            }
+        }
+
+        leaf kdu-resource-profile-id {
+            description
+              "If the execution environment is associated to a kdu resource object,
+              this parameter is the reference to the kdu-resource-profile id.";
+            type string;
+        }
+
+        leaf vnf-profile-id {
+            description
+              "If the execution environment is associated to a vnf object,
+              this parameter is the reference to the vnf-profile id.
+              Only valid in the NSd. The value is implicit in a VNFd.
+              To reference an execution environment associated to a vnf object
+              from the VNFd, none of the profile ids need to be specified.";
+            type leafref {
+                path "/nsd:nsd/nsd:nsd/nsd:df/nsd:vnf-profile/nsd:id";
+            }
+        }
+        leaf execution-environment-ref {
+            description
+              "Optional reference to the execution environment id.
+              Only needed if there is more than one execution environment
+              in the execution-environment-list of an object.";
+            type string;
+            default "";
+        }
+        leaf endpoint {
+            description
+              "Endpoint name of the execution environment.";
+            type string;
+        }
+    }
+
+    grouping relations {
+        list relation {
+            description
+              "List of relations between elements in this descriptor.
+               The relations are used to integrate pairs of execution environments,
+               that are in charge of the configuration and lifecycle management
+               of VDUs, VNFs, KDUs, or NSs.
+               Each relation is formed by a provider and a requirer.
+                  The provider is the execution environment that provides a particular service.
+                  The requirer is the execution environment that requires the service provided by the provider";
+            key "name";
+
+            leaf name {
+                description
+                  "Name of the relation.";
+
+                type string;
+            }
+            container provider {
+                description
+                  "Execution environment that offers an endpoint for a particular service";
+                uses relations-ee;
+            }
+            container requirer {
+                description
+                  "Execution environment that uses the service provided by the provider";
+                uses relations-ee;
+            }
+            list entities {
+                description
+                  "DEPRECATION NOTICE: use provider and requirer instead.
+                   List of two elements to be related.
+                   Elements to be related are identified by a pair (id, endpoint).
+                   The relation will relate (id1, endpoint1) to (id2, endpoint2).";
+                key "id";
+
+                leaf id {
+                    description
+                      "A string, reference to the element id in the descriptor.
+                       It could be a vnfd-id or a vdu-id in a VNFD,
+                       or a nsd-id or member-vnf-index in a NSD.";
+                    type string;
+                }
+
+                leaf endpoint {
+                    description
+                      "Endpoint name defining the relation.";
+                    type string;
+                }
+            }
+            must 'not(entities) or (not(provider) and not(requirer))' {
+                error-message 'Cannot set both "entities" and "provider/requirer" fields.';
+            }
+        }
+    }
+
+    grouping vnfc-metrics {
+        description
+          "Information about the VNF or VDU metrics";
+        list metrics {
+            description
+              "List of VNFC related metrics";
+            key "name";
+            leaf name {
+                description
+                  "Name of the metric, as defined in the Juju charm.";
+                type string;
+            }
+        }
+    }
+
+    grouping configuration-method {
+        choice config-method {
+            description
+              "Defines the configuration method for the VNF or VDU.";
+            case script {
+                description
+                  "Use custom script for configuring the VNF or VDU.
+                   This script is executed in the context of
+                   Orchestrator (The same system and environment
+                   as the Launchpad).";
+                container script {
+                    leaf script-type {
+                        description
+                          "Script type - currently supported - Scripts confirming to Rift CA plugin";
+                        type enumeration {
+                            enum rift;
+                        }
+                    }
+                }
+            }
+
+            case juju {
+                description
+                  "Configure the VNF or VDU through Juju.";
+                container juju {
+                    leaf charm {
+                        description
+                          "Juju charm to use with the VNF or VDU.";
+                        type string;
+                    }
+                    leaf proxy {
+                        description
+                          "Is this a proxy charm?";
+                        type boolean;
+                        default true;
+                    }
+                    leaf cloud {
+                        description
+                          "Type of cloud where the charm will be deployed. It only
+                           applies to proxy charms (not native)";
+                        type enumeration {
+                          enum lxd;
+                          enum k8s;
+                        }
+                        default lxd;
+                    }
+                }
+            }
+
+            case execution-environment-list {
+                description
+                  "List of Execution Environments to configure or monitor VNF or VDU.";
+                list execution-environment-list {
+                    key "id";
+                    leaf id {
+                      description "Execution environment identifier.";
+                    type string;
+                    }
+                    choice execution-environment-model {
+                        description
+                          "Execution environment model (juju, helm-chart)";
+                        case juju {
+                            description
+                              "Interact with the VNF or xDU through Juju.";
+                            container juju {
+                                leaf charm {
+                                  description
+                                    "Juju charm to use with the VNF or VDU.";
+                                  type string;
+                                }
+                                leaf proxy {
+                                  description
+                                    "Is this a proxy charm?";
+                                  type boolean;
+                                  default true;
+                                }
+                                leaf cloud {
+                                  description
+                                    "Type of cloud where the charm will be deployed. It only
+                                     applies to proxy charms (not native)";
+                                  type enumeration {
+                                    enum lxd;
+                                    enum k8s;
+                                  }
+                                  default lxd;
+                                }
+                            }
+                        }
+                        case helm-chart {
+                            description
+                              "Interact with the VNF or xDU through Helm.";
+                            leaf helm-chart {
+                                description
+                                  "Helm chart that models the execution environment, in any of the following ways:
+                                   - <helm-repo>/<helm-chart>
+                                   - <helm-chart folder name under helm-charts folder in the package>
+                                   - <helm-chart tgz file (w/ or w/o extension) under helm-charts folder in the package>
+                                   - <URL_where_to_fetch_chart>
+                                  ";
+                                type string;
+                            }
+                            leaf helm-version {
+                                description
+                                  "Helm version to use for this helm-chart, v3 by default";
+                                type enumeration {
+                                  enum "v3";
+                                }
+                                default "v3";
+                            }
+                        }
+                    }
+                    leaf metric-service {
+                        description
+                          "Service name in the execution environment. For helm charts, it will be
+                           the name of the kubernetes service used by the exporter to expose metrics
+                           to the OSM collector.
+                          ";
+                        type string;
+                    }
+                    leaf external-connection-point-ref {
+                        description
+                          "String representing a leaf reference to the particular external connection point
+                           This field should match /vnfd:vnfd-catalog/vnfd:vnfd/vnfd:id/vnfd:connection-point/vnfd:name
+                          ";
+                        type string;
+                    }
+                }
+            }
+        }
+    }
+
+    grouping vdu-config-access {
+
+        container config-access {
+
+            description
+              "Indicates the way to access to the xNF or xDU for VCA configuration.
+               For the moment there is a single way (ssh-access).";
+
+            container ssh-access {
+
+                description
+                  "If the xNF requires ssh and this parameter is set, SSH keys
+                   will be injected so that VCA can configure the xNF or xDU via ssh.";
+
+                leaf required {
+                    description
+                      "whether ssh access is needed or not";
+                    type boolean;
+                    default false;
+                }
+
+                leaf default-user {
+                    description
+                      "Default user for ssh";
+                    type string;
+                }
+            }
+        }
+    }
+    
+    grouping vnfc-configuration {
+        description
+          "Common information in the descriptors for NS, VNF or VDU configuration.
+           Note: If the NS contains multiple instances of the
+           same VNF or VDU, each instance could have a different
+           configuration.";
+
+        uses common:configuration-method;
+
+        list config-primitive {
+            description
+              "List of config primitives supported by the
+               configuration agent for this VNF or VDU.";
+            key "name";
+
+            leaf name {
+                description
+                  "Name of the config primitive.";
+                type string;
+            }
+
+            leaf execution-environment-ref {
+                description
+                  "Leaf reference to the particular execution environment";
+                type leafref {
+                  path "../../execution-environment-list/id";
+                }
+            }
+
+            leaf execution-environment-primitive {
+                description
+                  "Name of the primitive in the execution enviroment. If not explicit,
+                   the leaf 'name' will be used as the name of the primitive.";
+                type string;
+            }
+
+
+            list parameter {
+                description
+                  "List of parameters to the config primitive.";
+                key "name";
+                uses primitive-parameter;
+            }
+
+            leaf user-defined-script {
+                description
+                  "A user defined script. If user defined script is defined,
+                   the script will be executed using bash";
+                type string;
+            }
+        }
+
+        list initial-config-primitive {
+            description
+              "Initial set of configuration primitives.";
+            key "seq";
+            leaf seq {
+                description
+                  "Sequence number for the configuration primitive.";
+                type uint64;
+            }
+
+            choice primitive-type {
+                case primitive-definition {
+                    leaf name {
+                        description
+                          "Name of the configuration primitive.";
+                        type string;
+                    }
+
+                    leaf execution-environment-ref {
+                        description
+                          "Leaf reference to the particular execution environment";
+                        type leafref {
+                          path "../../execution-environment-list/id";
+                        }
+                    }
+
+                    uses primitive-parameter-value;
+
+                    leaf user-defined-script {
+                        description
+                          "A user defined script.";
+                        type string;
+                    }
+                }
+            }
+        }
+
+        list terminate-config-primitive {
+            description
+              "Terminate set of configuration primitives.";
+            key "seq";
+            leaf seq {
+                description
+                  "Sequence number for the configuration primitive.";
+                type uint64;
+            }
+            leaf name {
+                description
+                  "Name of the configuration primitive.";
+                type string;
+            }
+
+            leaf execution-environment-ref {
+                description
+                  "Leaf reference to the particular execution environment";
+                type leafref {
+                  path "../../execution-environment-list/id";
+                }
+            }
+
+            uses primitive-parameter-value;
+
+            leaf user-defined-script {
+                description
+                  "A user defined script.";
+                type string;
+            }
+        }
+        uses common:vnfc-metrics;
+    }
+
+    typedef alarm-severity-type {
+        description
+          "An indication of the importance or urgency of the alarm";
+        type enumeration {
+            enum LOW;
+            enum MODERATE;
+            enum CRITICAL;
+        }
+    }
+
+    typedef alarm-statistic-type {
+        description
+          "Statistic type to use to determine threshold crossing
+           for an alarm.";
+        type enumeration {
+            enum AVERAGE;
+            enum MINIMUM;
+            enum MAXIMUM;
+            enum COUNT;
+            enum SUM;
+        }
+    }
+
+    typedef relational-operation-type {
+        description
+          "The relational operator used to define whether an alarm,
+           scaling event, etc. should be triggered in certain scenarios,
+           such as if the metric statistic goes above or below a specified
+           value.";
+        type enumeration {
+            enum GE; // greater than or equal
+            enum LE; // less than or equal
+            enum GT; // greater than
+            enum LT; // less than
+            enum EQ; // equal
+            enum NE; // not equal
+        }
+    }
+
+    grouping alarm-properties {
+        leaf name {
+            description
+              "A human readable string to identify the alarm";
+            type string;
+        }
+
+        leaf description {
+            description
+              "A description of this alarm";
+            type string;
+        }
+
+        leaf vdur-id {
+            description
+              "The identifier of the VDUR that the alarm is associated with";
+            type string;
+        }
+
+        container actions {
+            list ok {
+                key "url";
+                leaf url {
+                    type string;
+                }
+            }
+
+            list insufficient-data {
+                key "url";
+                leaf url {
+                    type string;
+                }
+            }
+
+            list alarm {
+                key "url";
+                leaf url {
+                    type string;
+                }
+            }
+        }
+
+        leaf repeat {
+            description
+              "This flag indicates whether the alarm should be repeatedly emitted
+               while the associated threshold has been crossed.";
+
+            type boolean;
+            default true;
+        }
+
+        leaf enabled {
+            description
+              "This flag indicates whether the alarm has been enabled or
+               disabled.";
+
+            type boolean;
+            default true;
+        }
+
+        leaf severity {
+            description
+              "A measure of the importance or urgency of the alarm";
+            type alarm-severity-type;
+        }
+
+        leaf statistic {
+            description
+              "The type of metric statistic that is tracked by this alarm";
+            type alarm-statistic-type;
+        }
+
+        leaf operation {
+            description
+              "The relational operator used to define whether an alarm should be
+               triggered in certain scenarios, such as if the metric statistic
+               goes above or below a specified value.";
+            type relational-operation-type;
+        }
+
+        leaf value {
+            description
+              "This value defines the threshold that, if crossed, will trigger
+               the alarm.";
+            type decimal64 {
+                fraction-digits 4;
+            }
+        }
+
+        leaf period {
+            description
+              "The period defines the length of time (seconds) that the metric
+               data are collected over in oreder to evaluate the chosen
+               statistic.";
+            type uint32;
+        }
+
+        leaf evaluations {
+            description
+              "Defines the length of time (seconds) in which metric data are
+               collected in order to evaluate the chosen statistic.";
+            type uint32;
+        }
+    }
+
+    grouping virtual-interface {
+        container virtual-interface {
+            description
+              "Container for the virtual interface properties";
+
+            leaf type {
+                description
+                  "Specifies the type of virtual interface
+                   between VM and host.
+                   PARAVIRT        : Use the default paravirtualized interface for the VIM (virtio, vmxnet3, etc.).
+                   VIRTIO          : Deprecated! Use the traditional VIRTIO interface.
+                   PCI-PASSTHROUGH : Use PCI-PASSTHROUGH interface.
+                   SR-IOV          : Use SR-IOV interface.
+                   E1000           : Emulate E1000 interface.
+                   RTL8139         : Emulate RTL8139 interface.
+                   PCNET           : Emulate PCNET interface.
+                   OM-MGMT         : Deprecated! Use PARAVIRT instead and set the VNF management interface at vnfd:mgmt-interface:cp";
+
+                type enumeration {
+                    enum PARAVIRT;
+                    enum OM-MGMT;
+                    enum PCI-PASSTHROUGH;
+                    enum SR-IOV;
+                    enum VIRTIO;
+                    enum E1000;
+                    enum RTL8139;
+                    enum PCNET;
+                }
+                default "PARAVIRT";
+            }
+
+            leaf vpci {
+                description
+                  "Specifies the virtual PCI address. Expressed in
+                   the following format dddd:dd:dd.d. For example
+                   0000:00:12.0. This information can be used to
+                   pass as metadata during the VM creation.";
+                type string;
+            }
+
+            leaf bandwidth {
+                description
+                  "Aggregate bandwidth of the NIC.";
+                type uint64;
+            }
+        }
+    }
+
+    grouping description {
+        leaf description {
+            type string;
+        }
+    }
+
+    grouping vdu-storage-requirements {
+        list vdu-storage-requirements {
+            description
+              "Array of key-value pairs that articulate the storage
+               deployment requirements.
+
+               If the storage type is persistent-storage, the following setting
+               holds the persistent volume upon VM deletion:
+                 key: keep-volume
+                 value: true
+
+               If storage volume can be attached to several VMs, the following setting
+               will allow it:
+                 key: multiattach
+                 value: true";
+
+            key "key";
+
+            leaf key {
+                type string;
+            }
+
+            leaf value {
+                type string;
+            }
+        }
+    }
+
+    typedef scaling-trigger {
+        type enumeration {
+            enum pre-scale-in {
+                value 1;
+            }
+            enum post-scale-in {
+                value 2;
+            }
+            enum pre-scale-out {
+                value 3;
+            }
+            enum post-scale-out {
+                value 4;
+            }
+        }
+    }
+
+    typedef scaling-policy-type {
+        type enumeration {
+            enum manual {
+                value 1;
+            }
+            enum automatic {
+                value 2;
+            }
+        }
+    }
+
+    typedef scaling-criteria-operation {
+        type enumeration {
+            enum AND {
+                value 1;
+            }
+            enum OR {
+                value 2;
+            }
+        }
+    }
+}

@@ -1,0 +1,86 @@
+#  Copyright ETSI Contributors and Others
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+#  implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+nsd:
+  nsd:
+  - description: sfc_nsd Network Service
+    designer: TATA ELXSI
+    df:
+    - id: default-df
+      vnf-profile:
+      - id: vnf1
+        vnfd-id: src_vnf
+        virtual-link-connectivity:
+        - constituent-cpd-id:
+          - constituent-base-element-id: vnf1
+            constituent-cpd-id: eth0-ext
+            ip-address: 20.20.20.10
+          virtual-link-profile-id: private
+      - id: vnf2
+        vnfd-id: mid_vnf
+        virtual-link-connectivity:
+        - constituent-cpd-id:
+          - constituent-base-element-id: vnf2
+            constituent-cpd-id: eth0-ext
+            ip-address: 20.20.20.20
+          virtual-link-profile-id: private
+      - id: vnf3
+        vnfd-id: dest_vnf
+        virtual-link-connectivity:
+        - constituent-cpd-id:
+          - constituent-base-element-id: vnf3
+            constituent-cpd-id: eth0-ext
+            ip-address: 20.20.20.30
+          virtual-link-profile-id: private
+    vnffgd:
+    - id: vnffg1
+      vnf-profile-id:
+      - vnf2
+      nfp-position-element:
+      - id: test
+      nfpd:
+      - id: forwardingpath1
+        position-desc-id:
+        - id: position1
+          nfp-position-element-id:
+          - test
+          match-attributes:
+          -  id: rule1_80
+             ip-proto: 6
+             source-ip-address:  20.20.20.10
+             destination-ip-address: 20.20.20.30
+             source-port: 0
+             destination-port: 80
+             constituent-base-element-id: vnf1
+             constituent-cpd-id: eth0-ext
+          cp-profile-id:
+          -  id: cpprofile2
+             constituent-profile-elements:
+             - id: cp1
+               order: 0
+               constituent-base-element-id: vnf2
+               ingress-constituent-cpd-id: eth0-ext
+               egress-constituent-cpd-id: eth0-ext
+    id: sfc_nsd
+    name: sfc_nsd
+    version: '1.0'
+    virtual-link-desc:
+    - id: private
+      mgmt-network: 'true'
+      vim-network-name: private
+    vnfd-id:
+    - src_vnf
+    - mid_vnf
+    - dest_vnf

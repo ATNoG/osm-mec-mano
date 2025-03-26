@@ -1,0 +1,88 @@
+#  Copyright 2020 Whitestack LLC
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+#  implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+# Using new SOL006-based OSM model
+
+vnfd:
+  id: vnfd
+  mgmt-cp: vnf-mgmt-ext
+
+  sw-image-desc:
+    - id: ubuntu1804
+      image: ubuntu1804
+      name: ubuntu1804
+
+  ext-cpd:
+    - id: vnf-mgmt-ext
+      int-cpd:
+        vdu-id: mgmtVM
+        cpd: mgmtVM-eth0-int
+    - id: vnf-data-ext
+      int-cpd:
+        vdu-id: dataVM
+        cpd: dataVM-xe0-int
+
+  int-virtual-link-desc:
+    - id: internal
+
+  vdu:
+    - id: mgmtVM
+      sw-image-desc: ubuntu1804
+      int-cpd:
+        - id: mgmtVM-eth0-int
+          virtual-network-interface-requirement:
+            - name: mgmtVM-eth0
+              position: 1
+              virtual-interface:
+                type: VIRTIO
+        - id: mgmtVM-eth1-int
+          int-virtual-link-desc: internal
+          virtual-network-interface-requirement:
+            - name: mgmtVM-eth1
+              position: 2
+              virtual-interface:
+                type: VIRTIO
+
+    - id: dataVM
+      sw-image-desc: ubuntu1804
+      int-cpd:
+        - id: dataVM-eth0-int
+          int-virtual-link-desc: internal
+          virtual-network-interface-requirement:
+            - name: dataVM-eth0
+              position: 1
+              virtual-interface:
+                type: VIRTIO
+        - id: dataVM-xe0-int
+          virtual-network-interface-requirement:
+            - name: dataVM-xe0
+              position: 2
+              virtual-interface:
+                type: VIRTIO
+
+  df:
+    - id: default-df
+      instantiation-level:
+        - id: default-instantiation-level
+          vdu-level:
+            - number-of-instances: 1
+              vdu-id: mgmtVM
+            - number-of-instances: 1
+              vdu-id: dataVM
+      vdu-profile:
+        - id: mgmtVM
+          min-number-of-instances: 1
+        - id: dataVM
+          min-number-of-instances: 1

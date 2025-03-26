@@ -1,0 +1,325 @@
+/*
+ *
+ *   Copyright 2018 CTTC
+ *   Copyright 2018 Telefonica Investigacion y Desarrollo S.A.U.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ *
+ *
+ */
+
+module nst {
+  //header information
+  yang-version 1;
+  namespace "urn:etsi:osm:yang:nst";
+  prefix "nst";
+
+  import nsd-base{
+    prefix "nsd-base";
+  }
+
+  import nsd {
+    prefix "nsd";
+  }
+
+  import instantiation-parameters {
+    prefix "instantiation-parameters";
+  }
+
+  import ietf-inet-types {
+    prefix "inet";
+  }
+
+  //revision history
+  revision 2018-08-20 {
+    description "Initial version";
+  }
+
+  //typedef definitions
+  typedef connection-points {
+    description "";
+    type string;
+  }
+
+  typedef network-slice-type {
+    type enumeration {
+      enum eMBB {
+        description "enhanced Mobile Broadband slice";
+      }
+      enum URLLC {
+        description "Ultra Reliable Low Latency Communications slice";
+      }
+      enum mMTC {
+        description "massive Machine Type Communications slice";
+      }
+    }
+  }
+
+  typedef resource-type {
+    type enumeration {
+      enum delay-critical-GBR {
+        description "delay critical guaranted bit rate";
+      }
+      enum GBR {
+        description "guaranted bit rate";
+      }
+      enum non-GBR {
+        description "NON guaranted bit rate";
+      }
+    }
+  }
+
+  grouping nsvld {
+    description "List of NetSlice Subnet Virtual Link Descriptors.";
+
+    uses nsd-base:vld-common;
+
+    list nss-connection-point-ref {
+      description
+          "A list of references to connection points.";
+      key "nss-ref nsd-connection-point-ref";
+
+      leaf nss-ref {
+        description "Reference to nsd";
+        type leafref {
+          path "/nst:nst/nst:netslice-subnet/nst:id";
+        }
+      }
+
+      leaf nsd-connection-point-ref {
+        description "A reference to a connection point name";
+        type leafref {
+          path "/nsd:nsd-catalog/nsd:nsd/nsd:connection-point/nsd:name";
+        }
+      }
+
+      leaf ip-address {
+        description "IP address of the connection point";
+        type inet:ip-address;
+      }
+
+    }
+  } // nsvld
+
+  grouping snssai {
+    description "";
+    leaf slice-service-type {
+      description "Network slice service type ";
+      type network-slice-type;
+      mandatory true;
+    }
+    leaf slice-differentiator {
+      description "Network slice differentiator";
+      type string;
+    }
+  } // snssai
+
+  grouping five-qi {
+    leaf id{
+      description "Quality of service identifier";
+      type uint16;
+      mandatory true;
+    }
+    leaf resource-type {
+      description "Quality of service resource type";
+      type resource-type;
+    }
+    leaf priority-level {
+      description "Priority level of the service";
+      type uint16;
+    }
+    leaf packet-delay-budget {
+      description "Packet delay budget in miliseconds (ms)";
+      type uint16;
+    }
+    leaf packet-error-rate {
+      description "Packet error rate (PER) given in powers of ten";
+      type uint16;
+    }
+    leaf default-max-data-burst {
+      description "Maximum data burst given in bytes (B)";
+      type uint16;
+    }
+  }
+
+  grouping netslice-subnet {
+    leaf id {
+      description "Identifier or name for the netslice-subnet in NST scope.";
+      mandatory true;
+      type string {
+        length 1..63;
+      }
+    }
+    leaf description {
+      description "Description of the NSD.";
+      type string;
+    }
+    leaf is-shared-nss {
+      description "NSS is shared between NS";
+      type boolean;
+      default false;
+    }
+    leaf nsd-ref {
+      description "Reference to catalog NSD";
+      mandatory true;
+      type leafref{
+          path "/nsd:nsd-catalog/nsd:nsd/nsd:id";
+      }
+    }
+    container instantiation-parameters {
+      uses instantiation-parameters:ns_params;
+    }
+
+  }
+
+  grouping slice-connection-points {
+    description "List for external connection points. Each NS has one or more external connection
+                points. As the name implies that external connection points are used for connecting
+                the NS to other NS or to external networks. Each NS exposes these connection points 
+                to the orchestrator. The orchestrator can construct network service chains by 
+                connecting the connection points between different NS.";
+
+    uses nsd-base:nsd-connection-point-common;
+
+    choice connection {
+      description "Logical connection of the CP to a NSVLD or to a NSD CP";
+      case netslice-vld-ref {
+        leaf netslice-vld-id-ref {
+          description "ID reference to a NSVLD in the NS";
+          type leafref {
+            path "../../netslice-vld/id";
+          }
+
+        }
+      }
+      case nsd-connection-point-ref {
+        leaf nsd-id-ref {
+          description "A reference to a nsd.";
+          type leafref {
+            path "/nsd:nsd-catalog/nsd:nsd/nsd:id";
+          }
+        }
+        leaf nsd-connection-point-ref {
+          description "";
+          type leafref {
+            path "/nsd:nsd-catalog/nsd:nsd/nsd:connection-point/nsd:name";
+           }
+        }
+      }
+    }
+  }
+
+  grouping rsp {
+
+    uses nsd-base:rsp-common;
+
+    list nsd-connection-point-ref {
+      description
+        "A list of references to connection points.";
+      key "nsd-ref";
+
+      leaf nsd-ref {
+        description "Reference to member-vnf within constituent-vnfds";
+        type leafref {
+          path "/nsd:nsd-catalog/nsd:nsd/nsd:id";
+        }
+      }
+      leaf order {
+        type uint8;
+        description
+          "A number that denotes the order of a NSD in a chain";
+      }
+      leaf nsd-connection-point-ref {    
+        type leafref {
+          path "/nsd:nsd-catalog/nsd:nsd/nsd:connection-point/nsd:name";
+         }
+      }
+    }  
+  }
+
+  grouping classifier {
+    uses nsd-base:classifier-common;
+
+    leaf nsd-ref {
+      type leafref {
+          path "/nsd:nsd-catalog/nsd:nsd/nsd:id";
+      }
+    }
+
+    leaf nsd-connection-point-ref {
+
+      type leafref {
+        path "/nsd:nsd-catalog/nsd:nsd/nsd:connection-point/nsd:name";
+       }
+    }
+  }
+
+  grouping netslicefgd {
+
+    uses nsd-base:fgd-common;
+
+    list rsp {
+      description
+        "List of Rendered Service Paths (RSP).";
+      key "id";
+      uses rsp;
+    } 
+
+    list classifier {
+      description
+          "List of classifier rules.";
+      key "id";
+      uses classifier;
+    } 
+  }
+  grouping network-slice{
+    leaf id {
+      mandatory true;
+      type string;
+    }
+
+    leaf name {
+      type string;
+      mandatory true;
+    }
+
+    container SNSSAI-identifier {
+      uses snssai;
+    }
+    container quality-of-service {
+      uses five-qi;
+    }
+    list netslice-subnet {//list with multiple network service elements
+      key "id";
+      uses netslice-subnet;
+    }
+    list netslice-connection-point {
+      key "name";
+      uses slice-connection-points;
+    }
+    list netslice-vld {
+      key "id";
+      uses nsvld;
+    }
+    list netslicefgd {
+      key "id";
+      uses netslicefgd;
+    }
+  }
+
+  //containers definitions
+  list nst {
+    key "id";
+    uses network-slice;
+  }
+}

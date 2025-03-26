@@ -1,0 +1,118 @@
+/*
+ *
+ *   Copyright 2018 CTTC
+ *   Copyright 2018 Telefonica Investigacion y Desarrollo S.A.U.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ *
+ *
+ */
+
+module nsi {
+  //header information
+  yang-version 1;
+  namespace "urn:etsi:osm:yang:nsi";
+  prefix "nsi";
+
+  import nst {
+    prefix "nst";
+  }
+
+  import nsr {
+    prefix "nsr";
+  }
+
+  import osm-project {
+    prefix "osm-project";
+  }
+
+  import netslice-instantiation-parameters {
+    prefix "netslice-instantiation-parameters";
+  }
+
+  import ietf-yang-types {
+    prefix "yang";
+  }
+
+  //revision history
+  revision 2018-09-28 {
+    description "Initial version";
+  }
+
+  grouping nsi {
+    leaf id {
+      description "Identifier for the NSI.";
+      type yang:uuid;
+    }
+
+    leaf name {
+      description "NSI name.";
+      type string;
+      mandatory true;
+    }
+
+    leaf short-name {
+      description "NSI short name.";
+      type string;
+    }
+
+    leaf description {
+      description "NSI description.";
+      type string;
+    }
+
+    leaf nst-ref {
+      type leafref {
+        path "/nst:nst/nst:id";
+      }
+      mandatory true;
+    }
+
+    container instantiation-parameters {
+      uses netslice-instantiation-parameters:netslice_params;
+    }
+
+    container network-slice-template {
+      uses nst:network-slice;
+    }
+
+    list nsr-ref-list{
+      config false;
+      key "nsr-ref";
+      leaf nsr-ref {
+        description "Reference to instantiated NSR";
+        config false;
+        type leafref {
+          path "/osm-project:project/nsr:ns-instance-opdata/nsr:nsr/nsr:ns-instance-config-ref";
+        }
+      }
+    }
+
+    list vlr-list{
+      config false;
+      key "id";
+      leaf id {
+        description "ID of instantiated VLR";
+        config false;
+        type yang:uuid;
+      }
+    }
+  }
+
+  list nsi{
+    key "id";
+    unique "name";
+    uses nsi;
+  }
+
+}

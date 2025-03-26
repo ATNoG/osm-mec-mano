@@ -1,0 +1,182 @@
+#  Copyright 2020 Whitestack LLC
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+#  implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+vnfd:
+  id: hackfest3charmed-vnf
+  description: >-
+    A VNF consisting of 2 VDUs connected to an internal VL, and one VDU with
+    cloud-init
+  product-name: hackfest3charmed-vnf
+  version: '1.0'
+  mgmt-cp: vnf-mgmt-ext
+
+  virtual-compute-desc:
+    - id: mgmtVM-compute
+      virtual-cpu:
+        num-virtual-cpu: 1
+      virtual-memory:
+        size: 1
+    - id: dataVM-compute
+      virtual-cpu:
+        num-virtual-cpu: 1
+      virtual-memory:
+        size: 1
+
+  virtual-storage-desc:
+    - id: mgmtVM-storage
+      size-of-storage: 10
+    - id: dataVM-storage
+      size-of-storage: 10
+
+  sw-image-desc:
+    - id: hackfest3-mgmt
+      name: hackfest3-mgmt
+      image: hackfest3-mgmt
+
+  vdu:
+    - id: mgmtVM
+      name: mgmtVM
+      cloud-init-file: cloud-config.txt
+      sw-image-desc: hackfest3-mgmt
+      virtual-compute-desc: mgmtVM-compute
+      virtual-storage-desc:
+        - mgmtVM-storage
+      int-cpd:
+        - id: mgmtVM-eth0-int
+          virtual-network-interface-requirement:
+            - name: mgmtVM-eth0
+              position: 1
+              virtual-interface:
+                type: VIRTIO
+        - id: mgmtVM-eth1-int
+          int-virtual-link-desc: internal
+          virtual-network-interface-requirement:
+            - name: mgmtVM-eth1
+              position: 2
+              virtual-interface:
+                type: VIRTIO
+    - id: dataVM
+      name: dataVM
+      sw-image-desc: hackfest3-mgmt
+      virtual-compute-desc: dataVM-compute
+      virtual-storage-desc:
+        - dataVM-storage
+      int-cpd:
+        - id: dataVM-eth0-int
+          int-virtual-link-desc: internal
+          virtual-network-interface-requirement:
+            - name: dataVM-eth0
+              position: 1
+              virtual-interface:
+                type: VIRTIO
+        - id: dataVM-xe0-int
+          virtual-network-interface-requirement:
+            - name: dataVM-xe0
+              position: 2
+              virtual-interface:
+                type: VIRTIO
+      monitoring-parameter:
+        - id: dataVM_cpu_util
+          name: dataVM_cpu_util
+          performance-metric: cpu_utilization
+
+  int-virtual-link-desc:
+    - id: internal
+
+  ext-cpd:
+    - id: vnf-mgmt-ext
+      int-cpd: # Connection to int-cpd
+        vdu-id: mgmtVM
+        cpd: mgmtVM-eth0-int
+    - id: vnf-data-ext
+      int-cpd: # Connection to int-cpd
+        vdu-id: dataVM
+        cpd: dataVM-xe0-int
+
+  df:
+    - id: default-df
+      vdu-profile:
+        - id: mgmtVM
+          min-number-of-instances: 1
+        - id: dataVM
+          min-number-of-instances: 1
+          max-number-of-instances: 11
+      instantiation-level:
+        - id: default-instantiation-level
+          vdu-level:
+            - vdu-id: mgmtVM
+              number-of-instances: 1
+            - vdu-id: dataVM
+              number-of-instances: 1
+      scaling-aspect:
+        - id: scale_dataVM
+          name: scale_dataVM
+          max-scale-level: 10
+          aspect-delta-details:
+            deltas:
+              - id: scale_dataVM-delta
+                vdu-delta:
+                  - id: dataVM
+                    number-of-instances: 1
+          scaling-policy:
+            - name: auto_cpu_util_above_threshold
+              scaling-type: automatic
+              enabled: true
+              threshold-time: 0
+              cooldown-time: 60
+              scaling-criteria:
+                - name: cpu_util_above_threshold
+                  scale-in-relational-operation: LE
+                  scale-in-threshold: '15.0000000000'
+                  scale-out-relational-operation: GE
+                  scale-out-threshold: '60.0000000000'
+                  vnf-monitoring-param-ref: dataVM_cpu_util
+          scaling-config-action:
+            - trigger: post-scale-out
+              vnf-config-primitive-name-ref: touch
+            - trigger: pre-scale-in
+              vnf-config-primitive-name-ref: touch
+      lcm-operations-configuration:
+        operate-vnf-op-config:
+          day1-2:
+          - id: hackfest3charmed-vnf
+            execution-environment-list:
+            - id: simple-ee
+              juju:
+                charm: simple
+            initial-config-primitive:
+              - seq: "1"
+                execution-environment-ref: simple-ee
+                name: config
+                parameter:
+                  - name: ssh-hostname
+                    value: <rw_mgmt_ip>
+                  - name: ssh-username
+                    value: ubuntu
+                  - name: ssh-password
+                    value: osm4u
+              - seq: "2"
+                execution-environment-ref: simple-ee
+                name: touch
+                parameter:
+                  - name: filename
+                    value: <touch_filename>
+            config-primitive:
+              - name: touch
+                execution-environment-ref: simple-ee
+                parameter:
+                  - data-type: STRING
+                    default-value: <touch_filename2>
+                    name: filename

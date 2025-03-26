@@ -1,0 +1,72 @@
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+venv
+
+.tox
+
+*.pyc
+*.pyo
+.cache
+.tox
+
+#IDEs
+.idea
+.project
+.pydevproject
+.settings/
+.vscode
+
+# Unit test / coverage reports
+.coverage
+cover
+coverage.xml
+nosetests.xml
+
+#Generated folders when building the deb package locally
+debian/osm-imdocs.install
+.eggs
+*egg-info
+*.gz
+osm_im_trees
+dists
+pool
+deb_dist
+dist
+osm-im-*.post*
+osm-imdocs-*.post*
+osm-imdocs_*.post*
+osm_im/nsd.py
+osm_im/vnfd.py
+osm_im/nst.py
+osm_im/nsi.py
+osm_im/osm.yaml
+osm_im/etsi-nfv-nsd.py
+osm_im/etsi_nfv_nsd.py
+osm_im/etsi-nfv-vnfd.py
+osm_im/etsi_nfv_vnfd.py
+sol006_model
+
+#Pyang and other tools' folders
+pyangbind
+pyang
+yang2swagger
+
+#YANG IETF files, retrieved from YANGmodels github
+models/yang/ietf-yang-types.yang
+models/yang/ietf-inet-types.yang
+
+#local stuff files that end in ".local" or folders called "local"
+*.local
+local
+

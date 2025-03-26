@@ -1,0 +1,166 @@
+/*
+  # Copyright ETSI Contributors and Others.
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+  implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+module vnffgd {
+    yang-version 1.1;
+    namespace "urn:etsi:osm:yang:augments:vnffgd";
+    prefix "vnffgd";
+
+    import etsi-nfv-nsd {
+        prefix nsd;
+    }
+
+    import ietf-inet-types {
+        prefix inet;
+    }
+
+    grouping match {
+        list match-attributes {
+            description
+                "List of match attributes.";
+
+            key "id";
+            leaf id {
+                description
+                    "Identifier for the classifier match attribute rule.";
+                type string;
+            }
+
+            leaf ip-proto {
+                description
+                    "IP Protocol.";
+                type uint8;
+            }
+
+            leaf source-ip-address {
+                description
+                    "Source IP address.";
+                type inet:ip-address;
+            }
+
+            leaf destination-ip-address {
+                description
+                    "Destination IP address.";
+                type inet:ip-address;
+            }
+
+            leaf source-port {
+                description
+                    "Source port number.";
+                type inet:port-number;
+            }
+
+            leaf destination-port {
+                description
+                    "Destination port number.";
+                type inet:port-number;
+            }
+
+            leaf constituent-base-element-id {
+                description
+                    "Refer to the profile of source NS constituent.";
+                type leafref {
+                    path "/nsd:nsd/nsd:nsd/nsd:df/nsd:vnf-profile/nsd:id";
+                }
+            }
+
+            leaf constituent-cpd-id {
+                description
+                    "Logical source port.";
+                type string;
+            }
+            //TODO: Add more match criteria
+        } //match-attributes
+
+    }
+
+    grouping extended-position-element {
+
+        leaf-list nfp-position-element-id {
+            type leafref {
+              path "../../../nfp-position-element/id";
+            }
+            description
+              "References one or a pair of CPDs or SAPDs.";
+            reference
+              "GS NFV IFA014: Section 6.4.5.2 NfpPositionDesc
+               information element";
+          }
+    }
+
+    grouping extended-nfp-position {
+        list nfp-position-element {
+            key "id";
+            leaf id {
+                type string;
+                description
+                    "Identifier of this NfpPositionElemen information
+                    element. It uniquely identifies an
+                    NfpPositionElement.";
+                reference
+                    "GS NFV IFA014: Section 6.4.6.2 NfpPositionElement
+                    information element";
+            }
+        }
+
+    }
+
+    grouping extended-cpe {
+        leaf constituent-base-element-id {
+            type leafref {
+                path "/nsd:nsd/nsd:nsd/nsd:vnffgd/nsd:vnf-profile-id";
+            }
+        }
+
+        leaf order {
+            type uint8;
+            description
+              "A number that denotes the order of a VNF in a chain";
+        }
+
+        leaf ingress-constituent-cpd-id {
+            description
+              "A reference to a connection point name
+                  in a vnfd.";
+
+            type string;
+        }
+
+        leaf egress-constituent-cpd-id {
+            description
+              "A reference to a connection point name
+                  in a vnfd.";
+
+            type string;
+        }
+    }
+
+    augment "/nsd:nsd/nsd:nsd/nsd:vnffgd/nsd:nfpd/nsd:position-desc-id" {
+        uses match;
+    }
+
+    augment "/nsd:nsd/nsd:nsd/nsd:vnffgd" {
+        uses extended-nfp-position;
+    }
+
+    augment "/nsd:nsd/nsd:nsd/nsd:vnffgd/nsd:nfpd/nsd:position-desc-id" {
+        uses extended-position-element;
+    }
+
+    augment "/nsd:nsd/nsd:nsd/nsd:vnffgd/nsd:nfpd/nsd:position-desc-id/nsd:cp-profile-id/nsd:constituent-profile-elements"{
+        uses extended-cpe;
+    }
+}

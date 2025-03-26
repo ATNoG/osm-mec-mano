@@ -1,0 +1,167 @@
+/*
+  Copyright 2020 Whitestack LLC
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+  implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+module kdu {
+    yang-version 1.1;
+    namespace "urn:etsi:osm:yang:augments:kdu";
+    prefix "kdu";
+
+    import etsi-nfv-vnfd {
+        prefix vnfd;
+    }
+
+    grouping extended-ext-cpd {
+        leaf k8s-cluster-net {
+            description
+              "Reference to the K8s cluster network
+               to which CPs instantiated from this external CP
+               Descriptor (CPD) connect.";
+            type leafref {
+                path "/vnfd:vnfd/kdu:k8s-cluster/kdu:nets/kdu:id";
+            }
+        }
+    }
+
+    grouping extended-kdu {
+        list kdu {
+            description
+              "List of K8s Deployment Units";
+            key "name";
+
+            leaf name {
+                description
+                  "Unique name for the KDU";
+                type string;
+            }
+
+            leaf description {
+                description
+                  "Description of the KDU.";
+                type string;
+            }
+
+            choice kdu-model {
+                description
+                  "Indicates the KDU model, either as a helm-chart or as a juju-bundle.";
+
+                case helm-chart {
+                    leaf helm-chart {
+                        description
+                          "Helm chart that models the KDU, in any of the following ways:
+                           - <helm-repo>/<helm-chart>
+                           - <helm-chart folder under k8s_models folder in the package>
+                           - <helm-chart tgz file (w/ or w/o extension) under k8s_models folder in the package>
+                           - <URL_where_to_fetch_chart>
+                          ";
+                        type string;
+                    }
+
+                    leaf helm-version {
+                        description
+                          "Helm version to use for this helm-chart, v3 by default";
+                        type enumeration {
+                            enum v3;
+                        }
+                        default v3;
+                    }
+                }
+
+                case juju-bundle {
+                    leaf juju-bundle {
+                        description
+                          "Juju bundle that models the KDU, in any of the following ways:
+                           - <juju-repo>/<juju-bundle>
+                           - <juju-bundle folder under k8s_models folder in the package>
+                           - <juju-bundle tgz file (w/ or w/o extension) under k8s_models folder in the package>
+                           - <URL_where_to_fetch_juju_bundle>
+                          ";
+                        type string;
+                    }
+                }
+            }
+
+            list service {
+              description
+                "List of Kubernetes services exposed by the KDU.
+                 If empty, all services are assumed to be exposed in the CP associated to the first network
+                 in k8s-cluster.nets.";
+              key name;
+
+              leaf name {
+                description "Name of the Kubernetes service exposed by he KDU model";
+                type string;
+              }
+
+              leaf external-connection-point-ref {
+                description
+                  "String representing a leaf reference to the particular external connection point.
+                   This field should match /etsi-nfv-vnfd:vnfd/etsi-nfv-vnfd:ext-cpd/etsi-nfv-vnfd:id
+                  ";
+                type string;
+              }
+            }
+
+        }
+
+        container k8s-cluster {
+            leaf-list version {
+                description
+                  "List of supported K8s versions.
+                   The cluster where the KDUs will be deployed will have to match
+                   one of these versions.";
+
+                type string;
+            }
+
+            leaf-list cni {
+                description
+                  "List of supported CNI plugins.
+                   The cluster where the KDUs will be deployed will have to use
+                   one of these CNI plugins.";
+
+                type enumeration {
+                    enum calico;
+                    enum flannel;
+                    enum multus;
+                }
+            }
+
+            list nets {
+                description
+                  "List of required networks in the K8s cluster.
+                   The cluster where the KDUs will be deployed will have to use
+                   one of these CNI plugins.";
+
+                key "id";
+
+                leaf id {
+                    description
+                      "Internal identifier for the K8s cluster network in this VNF";
+                    type string;
+                }
+            }
+        }
+    }
+
+    augment "/vnfd:vnfd" {
+        uses extended-kdu;
+    }
+
+    augment "/vnfd:vnfd/vnfd:ext-cpd/vnfd:cp-connection" {
+        uses extended-ext-cpd;
+    }
+}

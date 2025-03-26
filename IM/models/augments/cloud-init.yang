@@ -1,0 +1,54 @@
+/*
+  Copyright 2019 Whitestack LLC
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+  implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+module cloud-init {
+    yang-version 1.1;
+    namespace "urn:etsi:osm:yang:augments:cloud-init";
+    prefix "cloud-init";
+
+    import etsi-nfv-vnfd {
+        prefix vnfd;
+    }
+
+    grouping extended-cloud-init {
+        choice cloud-init-input {
+            description
+                "Indicates how the contents of cloud-init script are provided.
+                There are 2 choices - inline or in a file";
+
+            case inline {
+                leaf cloud-init {
+                description
+                    "Contents of cloud-init script, provided inline, in cloud-config format";
+                type string;
+                }
+            }
+
+            case filename {
+                leaf cloud-init-file {
+                description
+                    "Name of file with contents of cloud-init script in cloud-config format";
+                    type string;
+                }
+            }
+        }
+    }
+        
+    augment "/vnfd:vnfd/vnfd:vdu" {
+        uses extended-cloud-init;
+    }
+}

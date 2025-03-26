@@ -1,0 +1,131 @@
+/*
+  Copyright 2020 Whitestack LLC
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+  implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+module various {
+    yang-version 1.1;
+    namespace "urn:etsi:osm:yang:augments:various";
+    prefix "various";
+
+    import etsi-nfv-vnfd {
+        prefix vnfd;
+    }
+    
+    grouping extended-vld {
+        container provider-network {
+            description
+              "Container for the provider network.";
+            leaf physical-network {
+                description
+                  "Name of the physical network on which the provider
+                   network is built.";
+                type string;
+            }
+
+            leaf segmentation_id {
+                description
+                  "ID of segregated virtual networks";
+                type uint32;
+            }
+        }
+    }
+
+    grouping extended-security-group {
+        leaf security-group {
+            description
+              "Name of the security group";
+            type string;
+        }
+    }
+
+    grouping extended-cpd {
+        leaf port-security-enabled {
+            description
+              "Enables the port security for the port.";
+            type boolean;
+            default true;
+        }
+        leaf port-security-disable-strategy {
+            description "Strategy to disable port security, either Enables the port security for the port.
+                         full                : disable port security in the whole port
+                         allow-address-pairs : allow address pairs for virtual IP (any virtual IP can be configured)";
+            type enumeration {
+                enum full;
+                enum allow-address-pairs;
+            }
+            default full;
+        }
+    }
+
+    grouping extended-vdu {
+        leaf pdu-type {
+            description
+              "Type of PDU. If this field exists, the deployment unit must be
+               understood as a PDU, not as a VDU. This field is used to identify
+               the category of PDU instances to be used at instantiation time. For
+               the instantiation to be successful, there must be available
+               PDU instances of this type in the selected datacenter.";
+            type string;
+        }
+
+        container supplemental-boot-data {
+            leaf boot-data-drive {
+                description
+                  "Some VIMs implement additional drives to host config-files or meta-data";
+                type boolean;
+                default false;
+            }
+        }
+    }
+
+    grouping extended-device-bus {
+        leaf device-bus {
+            description
+              "Type of disk-bus on which this disk is exposed to guest";
+            type enumeration {
+                enum ide;
+                enum usb;
+                enum virtio;
+                enum scsi;
+            }
+        }
+    }
+
+    augment "/vnfd:vnfd/vnfd:int-virtual-link-desc" {
+        uses extended-vld;
+    }
+
+    augment "/vnfd:vnfd/vnfd:df/vnfd:virtual-link-profile/vnfd:virtual-link-protocol-data/vnfd:l3-protocol-data" {
+        uses extended-security-group;
+    }
+
+    augment "/vnfd:vnfd/vnfd:ext-cpd" {
+        uses extended-cpd;
+    }
+
+    augment "/vnfd:vnfd/vnfd:vdu/vnfd:int-cpd" {
+        uses extended-cpd;
+    }
+
+    augment "/vnfd:vnfd/vnfd:vdu" {
+        uses extended-vdu;
+    }
+
+    augment "/vnfd:vnfd/vnfd:virtual-storage-desc" {
+        uses extended-device-bus;
+    }
+}
+

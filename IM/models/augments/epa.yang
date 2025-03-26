@@ -1,0 +1,258 @@
+/*
+  Copyright 2020 Whitestack LLC
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+  implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+module epa {
+    yang-version 1.1;
+    namespace "urn:etsi:osm:yang:augments:epa";
+    prefix "epa";
+
+    import etsi-nfv-vnfd {
+        prefix vnfd;
+    }
+
+    grouping allocation-properties {
+        leaf limit {
+            description
+              "Defines the maximum allocation. The value 0 indicates that usage is not limited.
+               This parameter ensures that the instance never uses more than the defined amount of resource.";
+            type uint64;
+        }
+
+        leaf reserve {
+            description
+              "Defines the guaranteed minimum reservation.
+               If needed, the machine will definitely get allocated the reserved amount of resources.";
+            type uint64;
+        }
+
+        leaf shares {
+            description
+              "Number of shares allocated.
+               Specifies the proportional weighted share for the domain.
+               If this element is omitted, the service defaults to the OS provided defaults";
+            type uint64;
+        }
+    }
+
+    grouping extended-mem-quota {
+        container mem-quota {
+            description
+              "Memory quota describes the memory resource allocation policy.
+               Limit and Reserve values are defined in MB";
+            uses allocation-properties;
+        }
+    }
+
+    grouping extended-vif-quota {
+        container vif-quota {
+            description
+              "Virtual interfaces quota describes the virtual interface bandwidth resource allocation policy.
+               Limit and Reserve values are defined in Mbps";
+            uses allocation-properties;
+        }
+    }
+
+    grouping extended-disk-io-quota {
+        container disk-io-quota {
+            description
+              "Disk IO quota describes the disk IO operations resource allocation policy.
+               Limit and Reserve values are defined in IOPS";
+            uses allocation-properties;
+        }
+    }
+
+    grouping extended-cpu-quota {
+        container cpu-quota {
+            description
+              "CPU quota describes the CPU resource allocation policy.
+               Limit and Reserve values are defined in MHz";
+            uses allocation-properties;
+        }
+    }
+
+    grouping extended-cpu-policy {
+        leaf thread-policy {
+            description
+              "CPU thread pinning policy describes how to
+               place the guest CPUs when the host supports
+               hyper threads:
+               REQUIRE : Each vCPU is allocated on thread siblings
+                         of the same core.
+               ISOLATE : Places each vCPU on a different core,
+                         and places no vCPUs from a different
+                         guest on the same core.
+               PREFER  : Attempts to place vCPUs on threads
+                         of the same core.";
+            type enumeration {
+                enum REQUIRE;
+                enum ISOLATE;
+                enum PREFER;
+            }
+        }
+    }
+
+    grouping extended-mempage-size {
+        leaf mempage-size {
+            description
+              "Memory page allocation size. If a VM requires
+               hugepages, it should choose LARGE or SIZE_2MB
+               or SIZE_1GB. If the VM prefers hugepages it
+               should choose PREFER_LARGE.
+               LARGE        : Require hugepages (either 2MB or 1GB)
+               SMALL        : Doesn't require hugepages
+               SIZE_2MB     : Requires 2MB hugepages
+               SIZE_1GB     : Requires 1GB hugepages
+               PREFER_LARGE : Application prefers hugepages";
+            type enumeration {
+                enum LARGE;
+                enum SMALL;
+                enum SIZE_2MB;
+                enum SIZE_1GB;
+                enum PREFER_LARGE;
+            }
+        }
+    }
+    grouping extended-numa {
+        container numa-node-policy {
+            description
+              "This policy defines NUMA topology of the
+               guest. Specifically identifies if the guest
+               should be run on a host with one NUMA
+               node or multiple NUMA nodes. As an example
+               a guest might need 8 VCPUs and 4 GB of
+               memory. However, it might need the VCPUs
+               and memory distributed across multiple
+               NUMA nodes. In this scenario, NUMA node
+               1 could run with 6 VCPUs and 3GB, and
+               NUMA node 2 could run with 2 VCPUs and
+               1GB.";
+
+            leaf node-cnt {
+                description
+                  "The number of NUMA nodes to expose to the VM.";
+                type uint16;
+            }
+
+            leaf mem-policy {
+                description
+                  "This policy specifies how the memory should
+                   be allocated in a multi-node scenario.
+                   STRICT    : The memory must be allocated
+                               strictly from the memory attached
+                               to the NUMA node.
+                   PREFERRED : The memory should be allocated
+                               preferentially from the memory
+                               attached to the NUMA node";
+                type enumeration {
+                    enum STRICT;
+                    enum PREFERRED;
+                }
+            }
+
+            list node {
+                key id;
+                leaf id {
+                    description
+                      "NUMA node identification. Typically
+                       it's 0 or 1";
+                    type uint64;
+                }
+
+                list vcpu {
+                    key "id";
+                    description
+                      "List of VCPUs to allocate on
+                       this NUMA node.";
+                    leaf id {
+                        type uint64;
+                        description
+                          "List of VCPUs ids to allocate on
+                           this NUMA node";
+                    }
+                }
+
+                leaf memory-mb {
+                    description
+                      "Memory size expressed in MB
+                       for this NUMA node.";
+                    type uint64;
+                }
+
+                choice om-numa-type {
+                    description
+                      "OpenMANO Numa type selection";
+
+                    case cores {
+                        leaf num-cores {
+                            type uint8;
+                        }
+                    }
+
+                    case paired-threads {
+                        container paired-threads {
+                            leaf num-paired-threads {
+                                type uint8;
+                            }
+
+                            list paired-thread-ids {
+                                description
+                                  "List of thread pairs to use in case of paired-thread NUMA";
+                                max-elements 16;
+                                key thread-a;
+
+                                leaf thread-a {
+                                    type uint8;
+                                }
+
+                                leaf thread-b {
+                                    type uint8;
+                                }
+                            }
+                        }
+                    }
+                    case threads {
+                        leaf num-threads {
+                            type uint8;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    augment "/vnfd:vnfd/vnfd:virtual-compute-desc/vnfd:virtual-memory" {
+        uses extended-numa;
+        uses extended-mempage-size;
+        uses extended-mem-quota;
+    }
+
+    augment "/vnfd:vnfd/vnfd:virtual-compute-desc/vnfd:virtual-cpu/vnfd:pinning" {
+        uses extended-cpu-policy;
+    }
+
+    augment "/vnfd:vnfd/vnfd:virtual-compute-desc/vnfd:virtual-cpu" {
+        uses extended-cpu-quota;
+    }
+
+    augment "/vnfd:vnfd/vnfd:virtual-storage-desc" {
+        uses extended-disk-io-quota;
+    }
+
+    augment "/vnfd:vnfd/vnfd:vdu/vnfd:int-cpd/vnfd:virtual-network-interface-requirement" {
+        uses extended-vif-quota;
+    }
+}

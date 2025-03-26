@@ -1,0 +1,49 @@
+/*
+  Copyright 2020 Tata Elxsi
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+  implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+module exporters {
+  yang-version 1.1;
+  namespace "urn:etsi:osm:yang:augments:exporters";
+  prefix "exporters";
+
+  import etsi-nfv-vnfd {
+    prefix vnfd;
+  }
+
+  grouping extended-exporters-endpoints {
+    container exporters-endpoints {
+      leaf metric-path {
+        type string;
+        description "The path to scrape metric from VNF";
+      }
+      leaf metric-port {
+        type uint16;
+        description "Port to scrape metric from VNF";
+      }
+      leaf external-connection-point-ref {
+        type leafref {
+          path "/vnfd:vnfd/vnfd:ext-cpd/vnfd:id";
+        }
+        description "Representing a leafref reference to the particular external connection point";
+      }
+    }
+  }
+
+  augment "/vnfd:vnfd/vnfd:df" {
+    uses extended-exporters-endpoints;
+  }
+}

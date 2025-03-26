@@ -1,0 +1,248 @@
+/*
+  Copyright 2020 Whitestack LLC
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+  implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+module scaling {
+    yang-version 1.1;
+    namespace "urn:etsi:osm:yang:augments:scaling";
+    prefix "scaling";
+
+    import etsi-nfv-vnfd {
+        prefix vnfd;
+    }
+
+    import common-augments {
+        prefix common;
+    }
+
+    import day1-2 {
+        prefix day1-2;
+    }
+
+    import kdu {
+        prefix kdu;
+    }
+
+    grouping extended-scaling {
+        list scaling-policy {
+
+            key "name";
+
+            leaf name {
+                description
+                  "Name of the scaling policy";
+                type string;
+            }
+
+            leaf scaling-type {
+                description
+                  "Type of scaling";
+                type common:scaling-policy-type;
+            }
+
+            leaf enabled {
+                description
+                  "Specifies if the scaling policy can be applied";
+                type boolean;
+                default true;
+            }
+
+            leaf scale-in-operation-type {
+                description
+                  "Operation to be applied to check between scaling criterias to
+                   check if the scale in threshold condition has been met.
+                   Defaults to AND";
+                type common:scaling-criteria-operation;
+                default AND;
+            }
+
+            leaf scale-out-operation-type {
+                description
+                  "Operation to be applied to check between scaling criterias to
+                   check if the scale out threshold condition has been met.
+                   Defauls to OR";
+                type common:scaling-criteria-operation;
+                default OR;
+            }
+
+            leaf threshold-time {
+                description
+                  "The duration for which the criteria must hold true";
+                type uint32;
+                mandatory true;
+            }
+
+            leaf cooldown-time {
+                description
+                  "The duration after a scaling-in/scaling-out action has been
+                   triggered, for which there will be no further optional";
+                type uint32;
+                mandatory true;
+            }
+
+            list scaling-criteria {
+                description
+                  "list of conditions to be met for generating scaling
+                     requests";
+                key "name";
+
+                leaf name {
+                    type string;
+                }
+
+                leaf scale-in-threshold {
+                    description
+                      "Value below which scale-in requests are generated";
+                    type decimal64{
+                        fraction-digits 10;
+                    }
+                }
+
+                leaf scale-in-relational-operation {
+                    description
+                      "The relational operator used to compare the monitoring param
+                       against the scale-in-threshold.";
+                    type common:relational-operation-type;
+                    default LE;
+                }
+
+                leaf scale-out-threshold {
+                    description
+                      "Value above which scale-out requests are generated";
+                    type decimal64{
+                        fraction-digits 10;
+                    }
+                }
+
+                leaf scale-out-relational-operation {
+                    description
+                      "The relational operator used to compare the monitoring param
+                       against the scale-out-threshold.";
+                    type common:relational-operation-type;
+                    default GE;
+                }
+
+                leaf vnf-monitoring-param-ref {
+                    description
+                      "Reference to the VNF level monitoring parameter
+                       that is aggregated";
+                    type string;
+                    
+                }
+            }
+        }
+
+        list scaling-config-action {
+            description
+              "List of scaling config actions";
+            key "trigger";
+
+            leaf trigger {
+                description
+                  "scaling trigger";
+                type common:scaling-trigger;
+            }
+
+            leaf vnf-config-primitive-name-ref {
+                description
+                  "Reference to the VNF config primitive";
+                type leafref {
+                    path "/vnfd:vnfd/vnfd:df/vnfd:lcm-operations-configuration/vnfd:operate-vnf-op-config/day1-2:day1-2/day1-2:config-primitive/day1-2:name";
+                }
+            }
+        }
+    }
+
+    grouping extended-kdu-resource-profile {
+      list kdu-resource-profile {
+        key "id";
+        description
+          "The Kdu resource profile describes additional instantiation data for
+           a given KDU used in a deployment flavour.";
+
+        leaf id {
+          type string;
+        }
+
+        leaf min-number-of-instances {
+          type uint16;
+          default 1;
+          description
+            "Minimum number of instances of the KNFC based on this
+             KDU resource that is permitted to exist for this flavour.";
+        }
+
+        leaf max-number-of-instances {
+          type uint16;
+          default 1;
+          must ". >= ../min-number-of-instances";
+        }
+
+        leaf resource-name {
+          type string;
+          description
+            "Name of the application of KDU";
+        }
+
+        leaf kdu-name {
+          type leafref {
+            path "/vnfd:vnfd/kdu:kdu/kdu:name";
+          }
+          description
+            "Name of the KDU";
+        }
+      }
+    }
+
+    grouping extended-deltas {
+      list kdu-resource-delta {
+        key "id";
+        description
+          "The number of KNFC instances based on particular
+            KDUs to be created or removed.";
+
+        leaf id {
+          type leafref {
+            path "../../../../../kdu-resource-profile/id";
+          }
+          description
+            "Uniquely identifies a KDU profile.";
+        }
+
+        leaf number-of-instances {
+          type uint32 {
+            range "0..max";
+          }
+          description
+            "Number of instances of KNFC based on this KDU to
+              deploy for an instantiation level or for a
+              scaling delta. Shall be zero or greater.";
+        }
+      }
+    }
+
+    augment "/vnfd:vnfd/vnfd:df" {
+        uses extended-kdu-resource-profile;
+    }
+
+    augment "/vnfd:vnfd/vnfd:df/vnfd:scaling-aspect" {
+        uses extended-scaling;
+    }
+
+    augment "/vnfd:vnfd/vnfd:df/vnfd:scaling-aspect/vnfd:aspect-delta-details/vnfd:deltas" {
+        uses extended-deltas;
+    }
+}

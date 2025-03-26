@@ -1,0 +1,123 @@
+/*
+  Copyright ETSI Contributors and Others
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+  implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+module healing {
+    yang-version 1.1;
+    namespace "urn:etsi:osm:yang:augments:healing";
+    prefix "healing";
+
+    import etsi-nfv-vnfd {
+        prefix vnfd;
+    }
+
+    typedef recovery-actions {
+        type enumeration {
+
+            enum REDEPLOY_ONLY {
+                value 1;
+            }
+
+            enum REBOOT {
+                value 2;
+            }
+
+            enum REBOOT_THEN_REDEPLOY {
+                value 3;
+            }
+        }
+    }
+
+
+    typedef recovery-type {
+        type enumeration {
+
+            enum manual {
+                value 1;
+            }
+
+            enum automatic {
+                value 2;
+            }
+        }
+    }
+
+    grouping extended-healing {
+        list healing-aspect {
+            key "id";
+
+            description
+              "The healing aspects supported by this DF of the VNF.
+               healingAspect shall be present if the VNF supports
+               healing.";
+
+            leaf id {
+                type string;
+                description
+                  "Unique identifier of this aspect in the VNFD.";
+            }
+
+            list healing-policy {
+
+                key "vdu-id";
+
+                leaf vdu-id {
+                    description
+                      "Identifier of vdu";
+                    type string;
+                }
+
+                leaf event-name {
+                    description
+                      "Describing the event name for healing";
+                    type string;
+                }
+
+                leaf recovery-type {
+                    description
+                      "Type of healing recovery";
+                    type recovery-type;
+                }
+
+                leaf action-on-recovery {
+                    description
+                      "Recovery actions for healing";
+                    type recovery-actions;
+                }
+
+                leaf cooldown-time {
+                    description
+                      "The duration after a healing action has been
+                      triggered, for which there will be no further optional";
+                    type uint32;
+                    mandatory true;
+                }
+
+                leaf day1 {
+                    description
+                      "Specifies if the day1 operations can be applied";
+                    type boolean;
+                    default false;
+                }
+            }
+        }
+
+    }
+    augment "/vnfd:vnfd/vnfd:df" {
+        uses extended-healing;
+    }
+
+}

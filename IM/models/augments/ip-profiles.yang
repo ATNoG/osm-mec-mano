@@ -1,0 +1,218 @@
+/*
+  Copyright 2019 Whitestack LLC
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+  implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+module ip-profiles {
+    yang-version 1.1;
+    namespace "urn:etsi:osm:yang:augments:ip-profiles";
+    prefix "ip-profiles";
+
+    import etsi-nfv-nsd {
+        prefix nsd;
+    }
+
+    import ietf-inet-types {
+        prefix inet;
+    }
+
+    import etsi-nfv-descriptors {
+        prefix nfv;
+    }
+
+    grouping extended-vld-protocol-data{
+        container virtual-link-protocol-data {
+          leaf associated-layer-protocol {
+            type identityref {
+              base nfv:layer-protocol;
+            }
+            description
+              "One of the values of the attribute layerProtocol of
+               the ConnectivityType IE.";
+            reference
+              "GS NFV IFA011: Section 7.1.8.13,
+               VirtualLinkProtocolData information element.";
+          }
+
+          container l2-protocol-data {
+            when "(../associated-layer-protocol = 'Ethernet') or " +
+                 "(../associated-layer-protocol = 'MPLS') or " +
+                 "(../associated-layer-protocol = 'ODU2') or " +
+                 "(../associated-layer-protocol = 'Pseudo-Wire')";
+
+            leaf name {
+              type string;
+              description
+                "Network name associated with this L2 protocol.";
+              reference
+                "GS NFV IFA011: Section 7.1.8.14,
+                 L2ProtocolData information element.";
+            }
+
+            leaf network-type {
+              type enumeration {
+                enum flat;
+                enum vlan;
+                enum vxlan;
+                enum gre;
+              }
+              description
+                "Specifies the network type for this L2 protocol.
+                 Possible values: FLAT, VLAN, VXLAN, GRE.";
+              reference
+                "GS NFV IFA011: Section 7.1.8.14,
+                 L2ProtocolData information element.";
+            }
+
+            leaf vlan-transparent {
+              type boolean;
+              description
+                "Specifies whether to support VLAN transparency for
+                 this L2 protocol or not.";
+              reference
+                "GS NFV IFA011: Section 7.1.8.14,
+                 L2ProtocolData information element.";
+            }
+
+            leaf mtu {
+              type uint16;
+              description
+                "Specifies the maximum transmission unit (MTU) value
+                 for this L2 protocol.";
+              reference
+                "GS NFV IFA011: Section 7.1.8.14,
+                 L2ProtocolData information element.";
+            }
+            description
+              "Specifies the L2 protocol data for this virtual link.
+               Shall be present when the associatedLayerProtocol
+               attribute indicates a L2 protocol and shall be absent
+               otherwise.";
+            reference
+              "GS NFV IFA011: Section 7.1.8.13,
+               VirtualLinkProtocolData information element.";
+          }
+
+          container l3-protocol-data {
+            when "(../associated-layer-protocol = 'IPv4') or " +
+                 "(../associated-layer-protocol = 'IPv6')";
+
+            leaf name {
+              type string;
+              description
+                "Network name associated with this L3 protocol.";
+              reference
+                "GS NFV IFA011: Section 7.1.8.15,
+                 L3ProtocolData information element.";
+            }
+
+            leaf ip-version {
+              type enumeration {
+                enum ipv4;
+                enum ipv6;
+              }
+              default "ipv4";
+              description
+                "Specifies IP version of this L3 protocol.
+                 Value:
+                 • IPV4.
+                 • IPV6.";
+              reference
+                "GS NFV IFA011: Section 7.1.8.15,
+                 L3ProtocolData information element.";
+            }
+
+            leaf cidr {
+              type string;
+              description
+                "Specifies the CIDR (Classless InterDomain Routing)
+                 of this L3 protocol.";
+              reference
+                "GS NFV IFA011: Section 7.1.8.15,
+                 L3ProtocolData information element.";
+            }
+
+            leaf-list ip-allocation-pools {
+              type string;
+              description
+                "Specifies the allocation pools with start and end
+                 IP addresses for this L3 protocol.";
+              reference
+                "GS NFV IFA011: Section 7.1.8.15,
+                 L3ProtocolData information element.";
+            }
+
+            leaf gateway-ip {
+              type inet:ip-address;
+              description
+                "Specifies the gateway IP address for this L3
+                 protocol.";
+              reference
+                "GS NFV IFA011: Section 7.1.8.15,
+                 L3ProtocolData information element.";
+            }
+
+            leaf dhcp-enabled {
+              type boolean;
+              default "true";
+              description
+                "Indicates whether DHCP (Dynamic Host Configuration
+                 Protocol) is enabled or disabled for this L3
+                 protocol.";
+              reference
+                "GS NFV IFA011: Section 7.1.8.15,
+                 L3ProtocolData information element.";
+            }
+
+            leaf ipv6-address-mode {
+              when "../ip-version = 'ipv6'";
+              type enumeration {
+                enum slaac;
+                enum dhcpv6-stateful;
+                enum dhcpv6-stateless;
+              }
+              description
+                "Specifies IPv6 address mode. Possible values:
+                 • SLAAC.
+                 • DHCPV6-STATEFUL.
+                 • DHCPV6-STATELESS.
+                 May be present when the value of the ipVersion
+                 attribute is 'IPV6' and shall be absent otherwise.";
+              reference
+                "GS NFV IFA011: Section 7.1.8.15,
+                 L3ProtocolData information element.";
+            }
+            description
+              "Specifies the L3 protocol data for this virtual link.
+               Shall be present when the associatedLayerProtocol
+               attribute indicates a L3 protocol and shall be absent
+               otherwise.";
+            reference
+              "GS NFV IFA011: Section 7.1.8.13,
+               VirtualLinkProtocolData information element.";
+          }
+          description
+            "Specifies the protocol data for a VL instantiated
+             according to this profile. Cardinality 0 is used when
+             no protocol data needs to be specified.";
+          reference
+            "GS NFV IFA011: Section 7.1.8.4, VirtualLinkProfile
+             information element.";
+        }
+    }
+        
+    augment "/nsd:nsd/nsd:nsd/nsd:df/nsd:virtual-link-profile" {
+        uses extended-vld-protocol-data;
+    }
+}

@@ -1,0 +1,80 @@
+#  Copyright ETSI Contributors and Others
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+#  implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+vnfd:
+  id: cirros_heal_vnfd
+  product-name: cirros_heal_vnf
+  description: Simple heal VNF example with a cirros
+  provider: OSM
+  version: "1.0"
+  mgmt-cp: eth0-ext
+
+  virtual-compute-desc:
+    - id: cirros_heal_vnfd-VM-compute
+      virtual-cpu:
+        num-virtual-cpu: 1
+      virtual-memory:
+        size: 0.25 # Memory size in GB
+
+  virtual-storage-desc:
+    - id: cirros_heal_vnfd-VM-storage
+      size-of-storage: 2
+
+  sw-image-desc:
+    - id: cirros034
+      name: cirros034
+      image: cirros034
+
+  vdu:
+    - id: cirros_heal_vnfd-VM
+      name: cirros_heal_vnfd-VM
+      description: cirros_heal_vnfd-VM
+      virtual-compute-desc: cirros_heal_vnfd-VM-compute
+      virtual-storage-desc:
+        - cirros_heal_vnfd-VM-storage
+      sw-image-desc: cirros034
+      int-cpd:
+        - id: eth0-int
+          virtual-network-interface-requirement:
+            - name: eth0
+              virtual-interface:
+                type: VIRTIO
+                bandwidth: "0"
+                vpci: 0000:00:0a.0
+
+  df:
+    - id: default-df
+      vdu-profile:
+        - id: cirros_heal_vnfd-VM
+          min-number-of-instances: 1
+      instantiation-level:
+        - id: default-instantiation-level
+          vdu-level:
+            - vdu-id: cirros_heal_vnfd-VM
+              number-of-instances: 1
+      healing-aspect:
+      -   id: cirros_heal_vnfd-VM_autoheal
+          healing-policy:
+          - vdu-id: cirros_heal_vnfd-VM
+            event-name: heal-alarm
+            recovery-type: automatic
+            action-on-recovery: REDEPLOY_ONLY
+            cooldown-time: 180
+            day1: false
+  ext-cpd:
+    - id: eth0-ext
+      int-cpd: # Connection to int-cpd
+        vdu-id: cirros_heal_vnfd-VM
+        cpd: eth0-int

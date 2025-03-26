@@ -1,0 +1,57 @@
+/*
+  Copyright 2020 Whitestack LLC
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+  implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+module alternative-images {
+    yang-version 1.1;
+    namespace "urn:etsi:osm:yang:alternative-images";
+    prefix "alternative-images";
+
+    import etsi-nfv-vnfd {
+        prefix vnfd;
+    }
+
+    grouping extended-vim-type {
+        leaf vim-type {
+            description
+              "VIM type: openvim, openstack, vmware, aws, etc.";
+            type string;
+        }
+    }
+    grouping extended-alternative-images {
+        leaf-list alternative-sw-image-desc {
+            description
+              "List of alternative images per VIM type.
+               Different images can be used for specific types of VIMs instead
+               of the default image. This allows deployments in sites where the
+               image identifier in the VIM is given by the VIM provider and
+               cannot be modified.
+               If an alternative image is specified for a VIM type, it will prevail
+               over the default image";
+            type leafref {
+                path "/vnfd:vnfd/vnfd:sw-image-desc/vnfd:id";
+            }
+        }
+    }
+
+    augment "/vnfd:vnfd/vnfd:sw-image-desc" {
+        uses extended-vim-type;
+    }
+
+    augment "/vnfd:vnfd/vnfd:vdu" {
+        uses extended-alternative-images;
+    }
+}
