@@ -40,4 +40,4 @@ done
 
 echo -e "$content" >> nodeSelector-deployment-patch.yaml
 
-kubectl kustomize && cd .. && rm -r /tmp/$dirname
+kustomize build && cd .. && rm -r /tmp/$dirname

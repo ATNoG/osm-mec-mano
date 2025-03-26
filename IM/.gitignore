@@ -56,6 +56,7 @@ osm_im/etsi_nfv_nsd.py
 osm_im/etsi-nfv-vnfd.py
 osm_im/etsi_nfv_vnfd.py
 sol006_model
+.m2
 
 #Pyang and other tools' folders
 pyangbind

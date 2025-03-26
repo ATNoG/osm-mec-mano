@@ -39,4 +39,4 @@ done
 # Add content to the file
 echo -e "\n$content" >> kustomization.yaml
 
-kubectl kustomize && cd .. && rm -r /tmp/$dirname
+kustomize build && cd .. && rm -r /tmp/$dirname

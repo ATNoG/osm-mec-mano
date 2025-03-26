@@ -287,6 +287,15 @@ ns_instantiate_internal_vld = {
     "additionalProperties": False,
 }
 
+node_selector_schema = {
+    "type": "object",
+    "minProperties": 1,
+    "additionalProperties": {
+        "type": "string",
+        "required": ["value"],
+    }
+}
+
 additional_params_for_vnf = {
     "type": "array",
     "items": {
@@ -319,6 +328,7 @@ additional_params_for_vnf = {
                         "additionalParams": object_schema,
                         "kdu_model": name_schema,
                         "k8s-namespace": name_schema,
+                        "node-selector": node_selector_schema,
                         "config-units": integer1_schema,  # number of configuration units of this knf, by default 1
                         "kdu-deployment-name": name_schema,
                     },

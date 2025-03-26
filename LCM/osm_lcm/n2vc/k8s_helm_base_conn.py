@@ -442,6 +442,7 @@ class K8sHelmBaseConnector(K8sConnector):
         labels: dict = None,
         kdu_name: str = None,
         namespace: str = None,
+        node_selector: dict = None,
     ):
         # init env, paths
         paths, env = self._init_paths_env(
@@ -459,6 +460,7 @@ class K8sHelmBaseConnector(K8sConnector):
             kdu_model,
             kdu_instance,
             namespace,
+            node_selector,
             labels,
             params_str,
             version,

@@ -3600,6 +3600,7 @@ class NsLcm(LcmBase):
                 timeout=timeout,
                 kdu_name=k8s_instance_info["kdu-name"],
                 namespace=k8s_instance_info["namespace"],
+                node_selector=k8s_instance_info["node-selector"],
                 kdu_instance=kdu_instance,
                 vca_id=vca_id,
             )
@@ -3825,6 +3826,7 @@ class NsLcm(LcmBase):
                         if kdud["name"] == kdur["kdu-name"]
                     )
                     namespace = kdur.get("k8s-namespace")
+                    node_selector = kdur.get("node-selector")
                     kdu_deployment_name = kdur.get("kdu-deployment-name")
                     if kdur.get("helm-chart"):
                         kdumodel = kdur["helm-chart"]
@@ -3938,6 +3940,7 @@ class NsLcm(LcmBase):
                         "kdu-name": kdur["kdu-name"],
                         "kdu-model": kdumodel,
                         "namespace": namespace,
+                        "node-selector": node_selector,
                         "kdu-deployment-name": kdu_deployment_name,
                     }
                     db_path = "_admin.deployed.K8s.{}".format(index)

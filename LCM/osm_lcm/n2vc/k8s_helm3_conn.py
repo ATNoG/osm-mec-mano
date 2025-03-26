@@ -80,6 +80,7 @@ class K8sHelm3Connector(K8sHelmBaseConnector):
         db_dict: dict = None,
         kdu_name: str = None,
         namespace: str = None,
+        node_selector: str = None,
         **kwargs,
     ):
         """Install a helm chart
@@ -147,6 +148,7 @@ class K8sHelm3Connector(K8sHelmBaseConnector):
             labels=labels_dict,
             kdu_name=kdu_name,
             namespace=namespace,
+            node_selector=node_selector,
         )
 
         # sync fs
@@ -489,6 +491,7 @@ class K8sHelm3Connector(K8sHelmBaseConnector):
         kdu_model: str,
         kdu_instance: str,
         namespace: str,
+        node_selector: str,
         labels: dict,
         params_str: str,
         version: str,
@@ -523,6 +526,20 @@ class K8sHelm3Connector(K8sHelmBaseConnector):
                     self.podLabels_post_renderer_path,
                     " ".join(
                         ["{}:{}".format(key, value) for key, value in labels.items()]
+                    ),
+                )
+            )
+        
+        # node selection
+        if node_selector and self.nodeSelector_post_renderer_path:
+            post_renderer_args.append(
+                "{}={}".format(
+                    self.nodeSelector_post_renderer_path,
+                    " ".join(
+                        [
+                            "{}:{}".format(key, value)
+                            for key, value in node_selector.items()
+                        ]
                     ),
                 )
             )
