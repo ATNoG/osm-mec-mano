@@ -52,6 +52,10 @@ RUN curl https://get.helm.sh/helm-v3.15.1-linux-amd64.tar.gz --output helm-v3.15
     && mv linux-amd64/helm /usr/local/bin/helm3 \
     && rm -r linux-amd64/
 
+# kustomize
+RUN curl -s -o install_kustomize.sh "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" && \
+    ./install_kustomize.sh
+
 ARG PYTHON3_OSM_COMMON_URL
 ARG PYTHON3_OSM_LCM_URL
 
@@ -94,6 +98,7 @@ RUN rm -f /etc/apt/apt.conf.d/proxy.conf
 
 COPY --from=INSTALL /usr/bin/kubectl /usr/bin/kubectl
 COPY --from=INSTALL /usr/local/bin/helm3 /usr/local/bin/helm3
+COPY --from=INSTALL /kustomize /usr/bin/kustomize
 COPY --from=INSTALL /usr/bin/scp /usr/bin/scp
 COPY --from=INSTALL /usr/bin/ssh-keygen /usr/bin/ssh-keygen
 COPY --from=INSTALL /usr/bin/ssh /usr/bin/ssh
