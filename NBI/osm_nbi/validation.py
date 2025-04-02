@@ -325,6 +325,7 @@ additional_params_for_vnf = {
                     "type": "object",
                     "properties": {
                         "kdu_name": name_schema,
+                        "enable": bool_schema,
                         "additionalParams": object_schema,
                         "kdu_model": name_schema,
                         "k8s-namespace": name_schema,

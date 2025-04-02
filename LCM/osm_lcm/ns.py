@@ -3591,114 +3591,115 @@ class NsLcm(LcmBase):
                     )
                     k8s_instance_info["namespace"] = kdu_instance
 
-            await self.k8scluster_map[k8sclustertype].install(
-                cluster_uuid=k8s_instance_info["k8scluster-uuid"],
-                kdu_model=k8s_instance_info["kdu-model"],
-                atomic=True,
-                params=k8params,
-                db_dict=db_dict_install,
-                timeout=timeout,
-                kdu_name=k8s_instance_info["kdu-name"],
-                namespace=k8s_instance_info["namespace"],
-                node_selector=k8s_instance_info["node-selector"],
-                kdu_instance=kdu_instance,
-                vca_id=vca_id,
-            )
+            if k8s_instance_info["enable"]:
+                await self.k8scluster_map[k8sclustertype].install(
+                    cluster_uuid=k8s_instance_info["k8scluster-uuid"],
+                    kdu_model=k8s_instance_info["kdu-model"],
+                    atomic=True,
+                    params=k8params,
+                    db_dict=db_dict_install,
+                    timeout=timeout,
+                    kdu_name=k8s_instance_info["kdu-name"],
+                    namespace=k8s_instance_info["namespace"],
+                    node_selector=k8s_instance_info["node-selector"],
+                    kdu_instance=kdu_instance,
+                    vca_id=vca_id,
+                )
 
-            # Obtain services to obtain management service ip
-            services = await self.k8scluster_map[k8sclustertype].get_services(
-                cluster_uuid=k8s_instance_info["k8scluster-uuid"],
-                kdu_instance=kdu_instance,
-                namespace=k8s_instance_info["namespace"],
-            )
+                # Obtain services to obtain management service ip
+                services = await self.k8scluster_map[k8sclustertype].get_services(
+                    cluster_uuid=k8s_instance_info["k8scluster-uuid"],
+                    kdu_instance=kdu_instance,
+                    namespace=k8s_instance_info["namespace"],
+                )
 
-            # Obtain management service info (if exists)
-            vnfr_update_dict = {}
-            kdu_config = get_configuration(vnfd, kdud["name"])
-            if kdu_config:
-                target_ee_list = kdu_config.get("execution-environment-list", [])
-            else:
-                target_ee_list = []
+                # Obtain management service info (if exists)
+                vnfr_update_dict = {}
+                kdu_config = get_configuration(vnfd, kdud["name"])
+                if kdu_config:
+                    target_ee_list = kdu_config.get("execution-environment-list", [])
+                else:
+                    target_ee_list = []
 
-            if services:
-                vnfr_update_dict["kdur.{}.services".format(kdu_index)] = services
-                mgmt_services = [
-                    service
-                    for service in kdud.get("service", [])
-                    if service.get("mgmt-service")
-                ]
-                for mgmt_service in mgmt_services:
-                    for service in services:
-                        if service["name"].startswith(mgmt_service["name"]):
-                            # Mgmt service found, Obtain service ip
-                            ip = service.get("external_ip", service.get("cluster_ip"))
-                            if isinstance(ip, list) and len(ip) == 1:
-                                ip = ip[0]
+                if services:
+                    vnfr_update_dict["kdur.{}.services".format(kdu_index)] = services
+                    mgmt_services = [
+                        service
+                        for service in kdud.get("service", [])
+                        if service.get("mgmt-service")
+                    ]
+                    for mgmt_service in mgmt_services:
+                        for service in services:
+                            if service["name"].startswith(mgmt_service["name"]):
+                                # Mgmt service found, Obtain service ip
+                                ip = service.get("external_ip", service.get("cluster_ip"))
+                                if isinstance(ip, list) and len(ip) == 1:
+                                    ip = ip[0]
 
-                            vnfr_update_dict[
-                                "kdur.{}.ip-address".format(kdu_index)
-                            ] = ip
+                                vnfr_update_dict[
+                                    "kdur.{}.ip-address".format(kdu_index)
+                                ] = ip
 
-                            # Check if must update also mgmt ip at the vnf
-                            service_external_cp = mgmt_service.get(
-                                "external-connection-point-ref"
+                                # Check if must update also mgmt ip at the vnf
+                                service_external_cp = mgmt_service.get(
+                                    "external-connection-point-ref"
+                                )
+                                if service_external_cp:
+                                    if (
+                                        deep_get(vnfd, ("mgmt-interface", "cp"))
+                                        == service_external_cp
+                                    ):
+                                        vnfr_update_dict["ip-address"] = ip
+
+                                    if find_in_list(
+                                        target_ee_list,
+                                        lambda ee: ee.get(
+                                            "external-connection-point-ref", ""
+                                        )
+                                        == service_external_cp,
+                                    ):
+                                        vnfr_update_dict[
+                                            "kdur.{}.ip-address".format(kdu_index)
+                                        ] = ip
+                                break
+                        else:
+                            self.logger.warn(
+                                "Mgmt service name: {} not found".format(
+                                    mgmt_service["name"]
+                                )
                             )
-                            if service_external_cp:
-                                if (
-                                    deep_get(vnfd, ("mgmt-interface", "cp"))
-                                    == service_external_cp
-                                ):
-                                    vnfr_update_dict["ip-address"] = ip
 
-                                if find_in_list(
-                                    target_ee_list,
-                                    lambda ee: ee.get(
-                                        "external-connection-point-ref", ""
-                                    )
-                                    == service_external_cp,
-                                ):
-                                    vnfr_update_dict[
-                                        "kdur.{}.ip-address".format(kdu_index)
-                                    ] = ip
-                            break
-                    else:
-                        self.logger.warn(
-                            "Mgmt service name: {} not found".format(
-                                mgmt_service["name"]
-                            )
+                vnfr_update_dict["kdur.{}.status".format(kdu_index)] = "READY"
+                self.update_db_2("vnfrs", vnfr_data.get("_id"), vnfr_update_dict)
+
+                kdu_config = get_configuration(vnfd, k8s_instance_info["kdu-name"])
+                if (
+                    kdu_config
+                    and kdu_config.get("initial-config-primitive")
+                    and get_juju_ee_ref(vnfd, k8s_instance_info["kdu-name"]) is None
+                    and get_helm_ee_ref(vnfd, k8s_instance_info["kdu-name"]) is None
+                ):
+                    initial_config_primitive_list = kdu_config.get(
+                        "initial-config-primitive"
+                    )
+                    initial_config_primitive_list.sort(key=lambda val: int(val["seq"]))
+
+                    for initial_config_primitive in initial_config_primitive_list:
+                        primitive_params_ = self._map_primitive_params(
+                            initial_config_primitive, {}, {}
                         )
 
-            vnfr_update_dict["kdur.{}.status".format(kdu_index)] = "READY"
-            self.update_db_2("vnfrs", vnfr_data.get("_id"), vnfr_update_dict)
-
-            kdu_config = get_configuration(vnfd, k8s_instance_info["kdu-name"])
-            if (
-                kdu_config
-                and kdu_config.get("initial-config-primitive")
-                and get_juju_ee_ref(vnfd, k8s_instance_info["kdu-name"]) is None
-                and get_helm_ee_ref(vnfd, k8s_instance_info["kdu-name"]) is None
-            ):
-                initial_config_primitive_list = kdu_config.get(
-                    "initial-config-primitive"
-                )
-                initial_config_primitive_list.sort(key=lambda val: int(val["seq"]))
-
-                for initial_config_primitive in initial_config_primitive_list:
-                    primitive_params_ = self._map_primitive_params(
-                        initial_config_primitive, {}, {}
-                    )
-
-                    await asyncio.wait_for(
-                        self.k8scluster_map[k8sclustertype].exec_primitive(
-                            cluster_uuid=k8s_instance_info["k8scluster-uuid"],
-                            kdu_instance=kdu_instance,
-                            primitive_name=initial_config_primitive["name"],
-                            params=primitive_params_,
-                            db_dict=db_dict_install,
-                            vca_id=vca_id,
-                        ),
-                        timeout=timeout,
-                    )
+                        await asyncio.wait_for(
+                            self.k8scluster_map[k8sclustertype].exec_primitive(
+                                cluster_uuid=k8s_instance_info["k8scluster-uuid"],
+                                kdu_instance=kdu_instance,
+                                primitive_name=initial_config_primitive["name"],
+                                params=primitive_params_,
+                                db_dict=db_dict_install,
+                                vca_id=vca_id,
+                            ),
+                            timeout=timeout,
+                        )
 
         except Exception as e:
             # Prepare update db with error and raise exception
