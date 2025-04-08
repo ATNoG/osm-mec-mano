@@ -567,14 +567,14 @@ ns_action = {  # TODO for the moment it is only contemplated the vnfd primitive 
     "additionalProperties": False,
 }
 
-ns_scale = {  # TODO for the moment it is only VDU-scaling
+ns_scale = {
     "title": "ns scale input schema",
-    "$schema": "http://json-schema.org/draft-04/schema#",
+    "$schema": "http://json-schema.org/draft-07/schema#",  # Need draft-07 for if/then/else
     "type": "object",
     "properties": {
         "lcmOperationType": string_schema,
         "nsInstanceId": id_schema,
-        "scaleType": {"enum": ["SCALE_VNF"]},
+        "scaleType": {"enum": ["SCALE_VNF", "DISABLE_KDU"]},
         "timeout_ns_scale": integer1_schema,
         "scaleVnfData": {
             "type": "object",
@@ -592,14 +592,43 @@ ns_scale = {  # TODO for the moment it is only VDU-scaling
                     "additionalProperties": False,
                 },
             },
-            "required": ["scaleVnfType", "scaleByStepData"],  # vnfInstanceId
+            "required": ["scaleVnfType", "scaleByStepData"],
+            "additionalProperties": False,
+        },
+        "disableKduData": {
+            "type": "object",
+            "properties": {
+                "kduName": name_schema,
+                "reason": string_schema,
+            },
+            "required": ["kduName"],
             "additionalProperties": False,
         },
         "scaleTime": time_schema,
     },
-    "required": ["scaleType", "scaleVnfData"],
+    "required": ["scaleType"],
+    "allOf": [
+        {
+            "if": {
+                "properties": {"scaleType": {"const": "SCALE_VNF"}},
+            },
+            "then": {
+                "required": ["scaleVnfData"]
+            },
+        },
+        {
+            "if": {
+                "properties": {"scaleType": {"const": "DISABLE_KDU"}},
+            },
+            "then": {
+                "required": ["disableKduData"]
+            },
+        },
+    ],
     "additionalProperties": False,
 }
+
+
 
 ns_migrate = {
     "title": "ns migrate input schema",

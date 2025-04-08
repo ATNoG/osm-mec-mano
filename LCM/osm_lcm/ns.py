@@ -3591,7 +3591,11 @@ class NsLcm(LcmBase):
                     )
                     k8s_instance_info["namespace"] = kdu_instance
 
-            if k8s_instance_info["enable"]:
+            self.logger.debug(f"Installing k8s instance {kdu_instance} with params {k8params}")
+            self.logger.debug(f"k8s_instance_info: {k8s_instance_info}")
+            enable = k8s_instance_info["enable"]
+            self.logger.debug(f"Enable: {enable}")
+            if enable:
                 await self.k8scluster_map[k8sclustertype].install(
                     cluster_uuid=k8s_instance_info["k8scluster-uuid"],
                     kdu_model=k8s_instance_info["kdu-model"],
@@ -3815,6 +3819,7 @@ class NsLcm(LcmBase):
             for vnfr_data in db_vnfrs.values():
                 vca_id = self.get_vca_id(vnfr_data, {})
                 for kdu_index, kdur in enumerate(get_iterable(vnfr_data, "kdur")):
+                    self.logger.debug("kdur: {}".format(kdur))
                     # Step 0: Prepare and set parameters
                     desc_params = parse_yaml_strings(kdur.get("additionalParams"))
                     vnfd_id = vnfr_data.get("vnfd-id")
@@ -3828,6 +3833,7 @@ class NsLcm(LcmBase):
                     )
                     namespace = kdur.get("k8s-namespace")
                     node_selector = kdur.get("node-selector")
+                    enable = kdur.get("enable")
                     kdu_deployment_name = kdur.get("kdu-deployment-name")
                     if kdur.get("helm-chart"):
                         kdumodel = kdur["helm-chart"]
@@ -3942,6 +3948,7 @@ class NsLcm(LcmBase):
                         "kdu-model": kdumodel,
                         "namespace": namespace,
                         "node-selector": node_selector,
+                        "enable": enable,
                         "kdu-deployment-name": kdu_deployment_name,
                     }
                     db_path = "_admin.deployed.K8s.{}".format(index)
@@ -6847,6 +6854,99 @@ class NsLcm(LcmBase):
                                 "scale": kdu_replica_count,
                             }
                         )
+            elif scaling_type == "DISABLE_KDU":
+                self.logger.debug("\n\n===========================\nDisable KDU\n===========================".format(kdur))
+                deltas = scaling_descriptor.get("aspect-delta-details")["deltas"]
+                self.logger.debug("deltas: {}".format(deltas))
+                
+
+                scaling_info["scaling_direction"] = "IN"
+                scaling_info["vdu-delete"] = {}
+                scaling_info["kdu-delete"] = {}
+
+                for delta in deltas:
+                    self.logger.debug("delta: {}".format(delta))
+                    for kdu_delta in delta.get("kdu-resource-delta", {}):
+                        self.logger.debug("kdu_delta: {}".format(kdu_delta))
+                        # kdu_profile = get_kdu_resource_profile(db_vnfd, kdu_delta["id"])
+                        # kdu_name = kdu_profile["kdu-name"]
+                        # resource_name = kdu_profile.get("resource-name", "")
+
+                        # if not scaling_info["kdu-delete"].get(kdu_name, None):
+                        #     scaling_info["kdu-delete"][kdu_name] = []
+
+                        # kdur = get_kdur(db_vnfr, kdu_name)
+                        # if kdur.get("helm-chart"):
+                        #     k8s_cluster_type = "helm-chart-v3"
+                        #     self.logger.debug("kdur: {}".format(kdur))
+                        # elif kdur.get("juju-bundle"):
+                        #     k8s_cluster_type = "juju-bundle"
+                        # else:
+                        #     raise LcmException(
+                        #         "kdu type for kdu='{}.{}' is neither helm-chart nor "
+                        #         "juju-bundle. Maybe an old NBI version is running".format(
+                        #             db_vnfr["member-vnf-index-ref"], kdur["kdu-name"]
+                        #         )
+                        #     )
+
+                        # min_instance_count = 0
+                        # if kdu_profile and "min-number-of-instances" in kdu_profile:
+                        #     min_instance_count = kdu_profile["min-number-of-instances"]
+
+                        # nb_scale_op -= kdu_delta.get("number-of-instances", 1)
+                        # deployed_kdu, _ = get_deployed_kdu(
+                        #     nsr_deployed, kdu_name, vnf_index
+                        # )
+                        # if deployed_kdu is None:
+                        #     raise LcmException(
+                        #         "KDU '{}' for vnf '{}' not deployed".format(
+                        #             kdu_name, vnf_index
+                        #         )
+                        #     )
+                        # kdu_instance = deployed_kdu.get("kdu-instance")
+                        # instance_num = await self.k8scluster_map[
+                        #     k8s_cluster_type
+                        # ].get_scale_count(
+                        #     resource_name,
+                        #     kdu_instance,
+                        #     vca_id=vca_id,
+                        #     cluster_uuid=deployed_kdu.get("k8scluster-uuid"),
+                        #     kdu_model=deployed_kdu.get("kdu-model"),
+                        # )
+                        # kdu_replica_count = instance_num - kdu_delta.get(
+                        #     "number-of-instances", 1
+                        # )
+
+                        # if kdu_replica_count < min_instance_count < instance_num:
+                        #     kdu_replica_count = min_instance_count
+                        # if kdu_replica_count < min_instance_count:
+                        #     raise LcmException(
+                        #         "reached the limit of {} (min-instance-count) scaling-in operations for the "
+                        #         "scaling-group-descriptor '{}'".format(
+                        #             instance_num, scaling_group
+                        #         )
+                        #     )
+
+                        # for x in range(kdu_delta.get("number-of-instances", 1)):
+                        #     vca_scaling_info.append(
+                        #         {
+                        #             "osm_kdu_id": kdu_name,
+                        #             "member-vnf-index": vnf_index,
+                        #             "type": "delete",
+                        #             "kdu_index": instance_num - x - 1,
+                        #         }
+                        #     )
+                        # scaling_info["kdu-delete"][kdu_name].append(
+                        #     {
+                        #         "member-vnf-index": vnf_index,
+                        #         "type": "delete",
+                        #         "k8s-cluster-type": k8s_cluster_type,
+                        #         "resource-name": resource_name,
+                        #         "scale": kdu_replica_count,
+                        #     }
+                        # )
+                self.logger.debug("===========================\n\n".format(kdur))
+                
 
             # update VDU_SCALING_INFO with the VDUs to delete ip_addresses
             vdu_delete = copy(scaling_info.get("vdu-delete"))

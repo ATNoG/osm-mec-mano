@@ -54,6 +54,7 @@ RUN curl https://get.helm.sh/helm-v3.15.1-linux-amd64.tar.gz --output helm-v3.15
 
 # kustomize
 RUN curl -s -o install_kustomize.sh "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" && \
+    chmod +x install_kustomize.sh && \
     ./install_kustomize.sh
 
 ARG PYTHON3_OSM_COMMON_URL

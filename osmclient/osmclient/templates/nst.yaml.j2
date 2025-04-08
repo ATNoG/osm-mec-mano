@@ -1,0 +1,125 @@
+# Copyright 2019 ETSI OSM
+#
+# All Rights Reserved.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+nst:
+-   id: {{ name }}_nst
+    name: {{ name }}_nst
+
+    # Slice Service Type [eMBB, mMTC, URLLC]
+    SNSSAI-identifier:
+        slice-service-type: eMBB
+        {%- if detailed is sameas true %}
+        #slice-differentiator: <update, optional>
+        {%- endif %}
+
+    # Quality of service identifier
+    quality-of-service:
+        id: 1
+        {%- if detailed is sameas true %}
+        #resource-type: <update, optional>
+        #priority-level: <update, optional>
+        #packet-delay-budget: <update, optional>
+        #packet-error-rate: <update, optional>
+        #default-max-data-burst: <update, optional>
+        {%- endif %}
+
+    # Netslice subnets (Network services)
+    netslice-subnet:
+    {%- for x in range(1, netslice_subnets + 1 ) %}
+    -   id: {{ name }}_nsd_{{ x }}
+        is-shared-nss: 'false'
+        description: NetSlice Subnet (service) {{ name }}_nsd_{{ x }}
+        nsd-ref: {{ name }}_nsd
+    {%- endfor %}
+
+    # Netslice virtual links
+    netslice-vld:
+    # Additional netslice-vld can be created by copying the
+    # vld descriptor below
+    -   id: {{ name }}_slice_vld_mgmt
+        name: {{ name }}_slice_vld_mgmt
+        type: ELAN
+        mgmt-network: 'true'
+        {%- if detailed is sameas true %}
+        #short-name: <update, optional>
+        #description: <update, optional>
+        {%- endif %}
+        nss-connection-point-ref:
+        # Specify the connection points
+        # Multiple connection points can be defined
+        -   nss-ref: {{ name }}_nsd_1
+            nsd-connection-point-ref: {{ name }}_nsd_cp_mgmt
+            {%- if detailed is sameas true %}
+            #ip-address: <update>
+            {%- endif %}
+
+    {%- for x in range(1, netslice_vlds + 1 ) %}
+    -   id: {{ name }}_slice_vld_data{{ x }}
+        name: {{ name }}_slice_vld_data{{ x }}
+        type: ELAN
+        {%- if detailed is sameas true %}
+        #mgmt-network: <update>
+        #short-name: <update, optional>
+        #description: <update, optional>
+        #type: <update, optional>
+        {%- endif %}
+        nss-connection-point-ref:
+        # Specify the connection points
+        # Multiple connection points can be defined
+        -   nss-ref: {{ name }}_nsd
+            nsd-connection-point-ref: {{ name }}_nsd_cp_data{{ x }}
+            {%- if detailed is sameas true %}
+            #ip-address: <update>
+            {%- endif %}
+    {%- endfor %}
+
+    {%- if detailed is sameas true %}
+    #netslice-connection-point:
+    #-   name:
+    #    floating-ip-required: <update>
+    #    # Choice connection | netslice-vld-ref / nsd-connection-point-ref
+    #    netslice-vld-id-ref: <update, optional>
+    #    #
+    #    nsd-id-ref: <update, optional>
+    #    nsd-connection-point-ref: <update, optional>
+
+    #netslicefgd:
+    #-   id: <update>
+    #    name: <update, optional>
+    #    short-name: <update, optional>
+    #    vendor: <update, optional>
+    #    description: <update, optional>
+    #    version: <update, optional>
+    #    rsp:
+    #    -   id: <update>
+    #        name: <update, optional>
+    #        nsd-connection-point-ref:
+    #        -   nsd-ref: <update>
+    #            order: <update, optional>
+    #            nsd-connection-point-ref: <update, optional>
+    #    classifier:
+    #    -   id: <update>
+    #        name: <update, optional>
+    #        rsp-id-ref: <update, optional>
+    #        match-attributes:
+    #        -   id: <update>
+    #            ip-proto: <update, optional>
+    #            source-ip-address: <update, optional>
+    #            destination-ip-address: <update, optional>
+    #            source-port: <update, optional>
+    #            destination-port: <update, optional>
+    #        nsd-ref: <update, optional>
+    #        nsd-connection-point-ref: <update, optional>
+    {%- endif %}

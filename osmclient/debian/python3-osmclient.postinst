@@ -1,0 +1,28 @@
+#!/bin/bash
+
+##
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+##
+
+echo "POST INSTALL OSMCLIENT"
+
+#configure autocomplete for osmclient
+[ -z "$SUDO_USER" ] && SUDO_USER="$USER"
+su $SUDO_USER -c 'mkdir -p $HOME/.bash_completion.d'
+su $SUDO_USER -c '_OSM_COMPLETE=source osm > $HOME/.bash_completion.d/osm-complete.sh'
+
+if ! su $SUDO_USER -c 'grep -q bash_completion.d/osm-complete.sh ${HOME}/.bashrc'
+then
+    echo "    inserting .bash_completion.d/osm-complete.sh execution at .bashrc"
+    su $SUDO_USER -c 'echo ". ${HOME}/.bash_completion.d/osm-complete.sh" >> ${HOME}/.bashrc'
+fi

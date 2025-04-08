@@ -895,6 +895,8 @@ class NsrTopic(BaseTopic):
             if kdu_params and kdu_params.get("k8s-namespace"):
                 kdu_k8s_namespace = kdu_params["k8s-namespace"]
             kdu_node_selector = kdu_params.get("node-selector") if kdu_params else None
+            kdu_enable = kdu_params.get("enable", True) if kdu_params else True
+
 
             kdu_deployment_name = ""
             if kdu_params and kdu_params.get("kdu-deployment-name"):
@@ -904,6 +906,7 @@ class NsrTopic(BaseTopic):
                 "additionalParams": additional_params,
                 "k8s-namespace": kdu_k8s_namespace,
                 "node-selector": kdu_node_selector,
+                "enable": kdu_enable,
                 "kdu-deployment-name": kdu_deployment_name,
                 "kdu-name": kdu["name"],
                 # TODO      "name": ""     Name of the VDU in the VIM
