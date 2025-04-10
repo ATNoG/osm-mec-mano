@@ -1,0 +1,4 @@
+FROM opensourcemano/lcm:devel
+
+# Update the code inside the container
+COPY ./LCM/osm_lcm /usr/lib/python3/dist-packages/osm_lcm

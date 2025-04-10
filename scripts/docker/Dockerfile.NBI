@@ -1,0 +1,4 @@
+FROM opensourcemano/nbi:devel
+
+# Update the code inside the container
+COPY ./NBI/osm_nbi /usr/lib/python3/dist-packages/osm_nbi
