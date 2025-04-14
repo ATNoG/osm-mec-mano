@@ -569,12 +569,12 @@ ns_action = {  # TODO for the moment it is only contemplated the vnfd primitive 
 
 ns_scale = {
     "title": "ns scale input schema",
-    "$schema": "http://json-schema.org/draft-07/schema#",  # Need draft-07 for if/then/else
+    "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
     "properties": {
         "lcmOperationType": string_schema,
         "nsInstanceId": id_schema,
-        "scaleType": {"enum": ["SCALE_VNF", "DISABLE_KDU"]},
+        "scaleType": {"enum": ["SCALE_VNF", "SCALE_KDU"]},
         "timeout_ns_scale": integer1_schema,
         "scaleVnfData": {
             "type": "object",
@@ -595,13 +595,14 @@ ns_scale = {
             "required": ["scaleVnfType", "scaleByStepData"],
             "additionalProperties": False,
         },
-        "disableKduData": {
+        "scaleKduData": {
             "type": "object",
             "properties": {
-                "kduName": name_schema,
-                "reason": string_schema,
+                "scaleKduType": {"enum": ["DISABLE", "ENABLE"]},
+                "member-vnf-index": name_schema,
+                "kdus-name": nameshort_list_schema,
             },
-            "required": ["kduName"],
+            "required": ["scaleKduType", "member-vnf-index", "kdus-name"],
             "additionalProperties": False,
         },
         "scaleTime": time_schema,
@@ -613,22 +614,20 @@ ns_scale = {
                 "properties": {"scaleType": {"const": "SCALE_VNF"}},
             },
             "then": {
-                "required": ["scaleVnfData"]
+                "required": ["scaleVnfData"],
             },
         },
         {
             "if": {
-                "properties": {"scaleType": {"const": "DISABLE_KDU"}},
+                "properties": {"scaleType": {"const": "SCALE_KDU"}},
             },
             "then": {
-                "required": ["disableKduData"]
+                "required": ["scaleKduData"],
             },
         },
     ],
     "additionalProperties": False,
 }
-
-
 
 ns_migrate = {
     "title": "ns migrate input schema",

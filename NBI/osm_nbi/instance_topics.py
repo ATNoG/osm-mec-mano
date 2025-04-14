@@ -1534,23 +1534,39 @@ class NsLcmOpTopic(BaseTopic):
             )
 
     def _check_scale_ns_operation(self, indata, nsr):
-        vnfd = self._get_vnfd_from_vnf_member_index(
-            indata["scaleVnfData"]["scaleByStepData"]["member-vnf-index"], nsr["_id"]
+        self.logger.info(
+            "Validating scale operation for ns instance: {}".format(nsr["_id"])
         )
-        for scaling_aspect in get_iterable(vnfd.get("df", ())[0]["scaling-aspect"]):
-            if (
-                indata["scaleVnfData"]["scaleByStepData"]["scaling-group-descriptor"]
-                == scaling_aspect["id"]
-            ):
-                break
-        else:
-            raise EngineException(
-                "Invalid scaleVnfData:scaleByStepData:scaling-group-descriptor '{}' is not "
-                "present at vnfd:scaling-aspect".format(
-                    indata["scaleVnfData"]["scaleByStepData"][
-                        "scaling-group-descriptor"
-                    ]
+        self.logger.info(
+            "indata: {}".format(json.dumps(indata, indent=4, sort_keys=True))
+        )
+
+        if indata["scaleType"] == "SCALE_VNF":
+            vnfd = self._get_vnfd_from_vnf_member_index(
+                indata["scaleVnfData"]["scaleByStepData"]["member-vnf-index"], nsr["_id"]
+            )
+            for scaling_aspect in get_iterable(vnfd.get("df", ())[0]["scaling-aspect"]):
+                if (
+                    indata["scaleVnfData"]["scaleByStepData"]["scaling-group-descriptor"]
+                    == scaling_aspect["id"]
+                ):
+                    break
+            else:
+                raise EngineException(
+                    "Invalid scaleVnfData:scaleByStepData:scaling-group-descriptor '{}' is not "
+                    "present at vnfd:scaling-aspect".format(
+                        indata["scaleVnfData"]["scaleByStepData"][
+                            "scaling-group-descriptor"
+                        ]
+                    )
                 )
+        elif indata["scaleType"] == "SCALE_KDU":
+            vnfd = self._get_vnfd_from_vnf_member_index(
+                indata["scaleKduData"]["member-vnf-index"], nsr["_id"]
+            )
+        else:
+            raise Exception(
+                "Invalid scaleType '{}'".format(indata["scaleType"])
             )
 
     def _check_heal_ns_operation(self, indata, nsr):

@@ -6482,81 +6482,104 @@ class NsLcm(LcmBase):
             self.update_db_2("nsrs", nsr_id, db_nsr_update)
             nsr_deployed = db_nsr["_admin"].get("deployed")
 
-            vnf_index = db_nslcmop["operationParams"]["scaleVnfData"][
-                "scaleByStepData"
-            ]["member-vnf-index"]
-            scaling_group = db_nslcmop["operationParams"]["scaleVnfData"][
-                "scaleByStepData"
-            ]["scaling-group-descriptor"]
-            scaling_type = db_nslcmop["operationParams"]["scaleVnfData"]["scaleVnfType"]
-            # for backward compatibility
-            if nsr_deployed and isinstance(nsr_deployed.get("VCA"), dict):
-                nsr_deployed["VCA"] = list(nsr_deployed["VCA"].values())
-                db_nsr_update["_admin.deployed.VCA"] = nsr_deployed["VCA"]
-                self.update_db_2("nsrs", nsr_id, db_nsr_update)
+            if db_nslcmop["operationParams"]["scaleType"] == "SCALE_VNF":
+                vnf_index = db_nslcmop["operationParams"]["scaleVnfData"][
+                    "scaleByStepData"
+                ]["member-vnf-index"]
+                scaling_group = db_nslcmop["operationParams"]["scaleVnfData"][
+                    "scaleByStepData"
+                ]["scaling-group-descriptor"]
+                scaling_type = db_nslcmop["operationParams"]["scaleVnfData"]["scaleVnfType"]
 
-            step = "Getting vnfr from database"
-            db_vnfr = self.db.get_one(
-                "vnfrs", {"member-vnf-index-ref": vnf_index, "nsr-id-ref": nsr_id}
-            )
+                # for backward compatibility
+                if nsr_deployed and isinstance(nsr_deployed.get("VCA"), dict):
+                    nsr_deployed["VCA"] = list(nsr_deployed["VCA"].values())
+                    db_nsr_update["_admin.deployed.VCA"] = nsr_deployed["VCA"]
+                    self.update_db_2("nsrs", nsr_id, db_nsr_update)
 
-            vca_id = self.get_vca_id(db_vnfr, db_nsr)
-
-            step = "Getting vnfd from database"
-            db_vnfd = self.db.get_one("vnfds", {"_id": db_vnfr["vnfd-id"]})
-
-            base_folder = db_vnfd["_admin"]["storage"]
-
-            step = "Getting scaling-group-descriptor"
-            scaling_descriptor = find_in_list(
-                get_scaling_aspect(db_vnfd),
-                lambda scale_desc: scale_desc["name"] == scaling_group,
-            )
-            if not scaling_descriptor:
-                raise LcmException(
-                    "input parameter 'scaleByStepData':'scaling-group-descriptor':'{}' is not present "
-                    "at vnfd:scaling-group-descriptor".format(scaling_group)
+                step = "Getting vnfr from database"
+                db_vnfr = self.db.get_one(
+                    "vnfrs", {"member-vnf-index-ref": vnf_index, "nsr-id-ref": nsr_id}
                 )
 
-            step = "Sending scale order to VIM"
-            # TODO check if ns is in a proper status
-            nb_scale_op = 0
-            if not db_nsr["_admin"].get("scaling-group"):
-                self.update_db_2(
-                    "nsrs",
-                    nsr_id,
-                    {
-                        "_admin.scaling-group": [
-                            {
-                                "name": scaling_group,
-                                "vnf_index": vnf_index,
-                                "nb-scale-op": 0,
-                            }
-                        ]
-                    },
+                vca_id = self.get_vca_id(db_vnfr, db_nsr)
+
+                step = "Getting vnfd from database"
+                db_vnfd = self.db.get_one("vnfds", {"_id": db_vnfr["vnfd-id"]})
+
+                base_folder = db_vnfd["_admin"]["storage"]
+
+                step = "Getting scaling-group-descriptor"
+                scaling_descriptor = find_in_list(
+                    get_scaling_aspect(db_vnfd),
+                    lambda scale_desc: scale_desc["name"] == scaling_group,
                 )
-                admin_scale_index = 0
-            else:
-                for admin_scale_index, admin_scale_info in enumerate(
-                    db_nsr["_admin"]["scaling-group"]
-                ):
-                    if (
-                        admin_scale_info["name"] == scaling_group
-                        and admin_scale_info["vnf_index"] == vnf_index
+                if not scaling_descriptor:
+                    raise LcmException(
+                        "input parameter 'scaleByStepData':'scaling-group-descriptor':'{}' is not present "
+                        "at vnfd:scaling-group-descriptor".format(scaling_group)
+                    )
+
+                step = "Sending scale order to VIM"
+                # TODO check if ns is in a proper status
+                nb_scale_op = 0
+                if not db_nsr["_admin"].get("scaling-group"):
+                    self.update_db_2(
+                        "nsrs",
+                        nsr_id,
+                        {
+                            "_admin.scaling-group": [
+                                {
+                                    "name": scaling_group,
+                                    "vnf_index": vnf_index,
+                                    "nb-scale-op": 0,
+                                }
+                            ]
+                        },
+                    )
+                    admin_scale_index = 0
+                else:
+                    for admin_scale_index, admin_scale_info in enumerate(
+                        db_nsr["_admin"]["scaling-group"]
                     ):
-                        nb_scale_op = admin_scale_info.get("nb-scale-op", 0)
-                        break
-                else:  # not found, set index one plus last element and add new entry with the name
-                    admin_scale_index += 1
-                    db_nsr_update[
-                        "_admin.scaling-group.{}.name".format(admin_scale_index)
-                    ] = scaling_group
-                    db_nsr_update[
-                        "_admin.scaling-group.{}.vnf_index".format(admin_scale_index)
-                    ] = vnf_index
+                        if (
+                            admin_scale_info["name"] == scaling_group
+                            and admin_scale_info["vnf_index"] == vnf_index
+                        ):
+                            nb_scale_op = admin_scale_info.get("nb-scale-op", 0)
+                            break
+                    else:  # not found, set index one plus last element and add new entry with the name
+                        admin_scale_index += 1
+                        db_nsr_update[
+                            "_admin.scaling-group.{}.name".format(admin_scale_index)
+                        ] = scaling_group
+                        db_nsr_update[
+                            "_admin.scaling-group.{}.vnf_index".format(admin_scale_index)
+                        ] = vnf_index
 
-            vca_scaling_info = []
-            scaling_info = {"scaling_group_name": scaling_group, "vdu": [], "kdu": []}
+                vca_scaling_info = []
+                scaling_info = {"scaling_group_name": scaling_group, "vdu": [], "kdu": []}
+            elif db_nslcmop["operationParams"]["scaleType"] == "SCALE_KDU":
+                vnf_index = db_nslcmop["operationParams"]["scaleKduData"]["member-vnf-index"]
+                scaling_type = db_nslcmop["operationParams"]["scaleKduData"]["scaleKduType"]
+                received_kdus = db_nslcmop["operationParams"]["scaleKduData"]["kdus-name"]
+
+                step = "Getting vnfr from database"
+                db_vnfr = self.db.get_one(
+                    "vnfrs", {"member-vnf-index-ref": vnf_index, "nsr-id-ref": nsr_id}
+                )
+
+                vca_id = self.get_vca_id(db_vnfr, db_nsr)
+
+                step = "Getting vnfd from database"
+                db_vnfd = self.db.get_one("vnfds", {"_id": db_vnfr["vnfd-id"]})
+
+                admin_scale_index = 0
+
+                scaling_descriptor = None
+                vca_scaling_info = []
+                scaling_info = {"kdu": []}
+
             if scaling_type == "SCALE_OUT":
                 if "aspect-delta-details" not in scaling_descriptor:
                     raise LcmException(
@@ -6854,103 +6877,150 @@ class NsLcm(LcmBase):
                                 "scale": kdu_replica_count,
                             }
                         )
-            elif scaling_type == "DISABLE_KDU":
-                self.logger.debug("\n\n===========================\nDisable KDU\n===========================".format(kdur))
-                deltas = scaling_descriptor.get("aspect-delta-details")["deltas"]
-                self.logger.debug("deltas: {}".format(deltas))
-                
+            elif scaling_type == "DISABLE":
+                self.logger.debug("\n\n===========================\nDisable KDU\n===========================")
+                self.logger.debug("\nGetting nsr from database")
+                self.logger.debug("db_nsr: {}".format(db_nsr))
+                self.logger.debug("vnf_index: {}".format(vnf_index))
+                self.logger.debug("\nGetting vnfr from database")
+                self.logger.debug("db_vnfr: {}".format(db_vnfr))
+                self.logger.debug("\nGetting vnfd from database")
+                self.logger.debug("db_vnfd: {}".format(db_vnfd))
 
-                scaling_info["scaling_direction"] = "IN"
-                scaling_info["vdu-delete"] = {}
                 scaling_info["kdu-delete"] = {}
 
-                for delta in deltas:
-                    self.logger.debug("delta: {}".format(delta))
-                    for kdu_delta in delta.get("kdu-resource-delta", {}):
-                        self.logger.debug("kdu_delta: {}".format(kdu_delta))
-                        # kdu_profile = get_kdu_resource_profile(db_vnfd, kdu_delta["id"])
-                        # kdu_name = kdu_profile["kdu-name"]
-                        # resource_name = kdu_profile.get("resource-name", "")
+                for kdu_name in received_kdus:
+                    self.logger.debug("Trying to find kdu: {}".format(kdu_name))
 
-                        # if not scaling_info["kdu-delete"].get(kdu_name, None):
-                        #     scaling_info["kdu-delete"][kdu_name] = []
+                    kdu = get_kdu(db_vnfd, kdu_name)
+                    self.logger.debug("kdu: {}".format(kdu))
 
-                        # kdur = get_kdur(db_vnfr, kdu_name)
-                        # if kdur.get("helm-chart"):
-                        #     k8s_cluster_type = "helm-chart-v3"
-                        #     self.logger.debug("kdur: {}".format(kdur))
-                        # elif kdur.get("juju-bundle"):
-                        #     k8s_cluster_type = "juju-bundle"
-                        # else:
-                        #     raise LcmException(
-                        #         "kdu type for kdu='{}.{}' is neither helm-chart nor "
-                        #         "juju-bundle. Maybe an old NBI version is running".format(
-                        #             db_vnfr["member-vnf-index-ref"], kdur["kdu-name"]
-                        #         )
-                        #     )
+                    if not kdu:
+                        continue
 
-                        # min_instance_count = 0
-                        # if kdu_profile and "min-number-of-instances" in kdu_profile:
-                        #     min_instance_count = kdu_profile["min-number-of-instances"]
+                    deployed_kdu, _ = get_deployed_kdu(
+                        nsr_deployed, kdu_name, vnf_index
+                    )
+                    if deployed_kdu is None or not deployed_kdu.get("enable"):
+                        raise LcmException(
+                            "KDU '{}' for vnf '{}' not deployed".format(
+                                kdu_name, vnf_index
+                            )
+                        )
 
-                        # nb_scale_op -= kdu_delta.get("number-of-instances", 1)
-                        # deployed_kdu, _ = get_deployed_kdu(
-                        #     nsr_deployed, kdu_name, vnf_index
-                        # )
-                        # if deployed_kdu is None:
-                        #     raise LcmException(
-                        #         "KDU '{}' for vnf '{}' not deployed".format(
-                        #             kdu_name, vnf_index
-                        #         )
-                        #     )
-                        # kdu_instance = deployed_kdu.get("kdu-instance")
-                        # instance_num = await self.k8scluster_map[
-                        #     k8s_cluster_type
-                        # ].get_scale_count(
-                        #     resource_name,
-                        #     kdu_instance,
-                        #     vca_id=vca_id,
-                        #     cluster_uuid=deployed_kdu.get("k8scluster-uuid"),
-                        #     kdu_model=deployed_kdu.get("kdu-model"),
-                        # )
-                        # kdu_replica_count = instance_num - kdu_delta.get(
-                        #     "number-of-instances", 1
-                        # )
+                    if not scaling_info["kdu-delete"].get(kdu_name, None):
+                        scaling_info["kdu-delete"][kdu_name] = []
 
-                        # if kdu_replica_count < min_instance_count < instance_num:
-                        #     kdu_replica_count = min_instance_count
-                        # if kdu_replica_count < min_instance_count:
-                        #     raise LcmException(
-                        #         "reached the limit of {} (min-instance-count) scaling-in operations for the "
-                        #         "scaling-group-descriptor '{}'".format(
-                        #             instance_num, scaling_group
-                        #         )
-                        #     )
+                    kdur = get_kdur(db_vnfr, kdu_name)
+                    self.logger.debug("kdur: {}".format(kdur))
+                    if kdur.get("helm-chart"):
+                        k8s_cluster_type = "helm-chart-v3"
+                    elif kdur.get("juju-bundle"):
+                        k8s_cluster_type = "juju-bundle"
+                    else:
+                        raise LcmException(
+                            "kdu type for kdu='{}.{}' is neither helm-chart nor "
+                            "juju-bundle. Maybe an old NBI version is running".format(
+                                db_vnfr["member-vnf-index-ref"], kdur["kdu-name"]
+                            )
+                        )
 
-                        # for x in range(kdu_delta.get("number-of-instances", 1)):
-                        #     vca_scaling_info.append(
-                        #         {
-                        #             "osm_kdu_id": kdu_name,
-                        #             "member-vnf-index": vnf_index,
-                        #             "type": "delete",
-                        #             "kdu_index": instance_num - x - 1,
-                        #         }
-                        #     )
-                        # scaling_info["kdu-delete"][kdu_name].append(
-                        #     {
-                        #         "member-vnf-index": vnf_index,
-                        #         "type": "delete",
-                        #         "k8s-cluster-type": k8s_cluster_type,
-                        #         "resource-name": resource_name,
-                        #         "scale": kdu_replica_count,
-                        #     }
-                        # )
-                self.logger.debug("===========================\n\n".format(kdur))
+                    kdu_instance = deployed_kdu.get("kdu-instance")
+                    self.logger.debug("kdu_instance: {}".format(kdu_instance))
+
+                    vca_scaling_info.append(
+                        {
+                            "osm_kdu_id": kdu_name,
+                            "member-vnf-index": vnf_index,
+                            "type": "uninstall",
+                        }
+                    )
+                    scaling_info["kdu-delete"][kdu_name].append(
+                        {
+                            "member-vnf-index": vnf_index,
+                            "type": "uninstall",
+                            "k8s-cluster-type": k8s_cluster_type,
+                        }
+                    )
+                nb_scale_op = 0
+                self.logger.debug("===========================\n\n")
+            
+            elif scaling_type == "ENABLE":
+                self.logger.debug("\n\n===========================\nEnable KDU\n===========================")
+                self.logger.debug("\nGetting nsr from database")
+                self.logger.debug("db_nsr: {}".format(db_nsr))
+                self.logger.debug("vnf_index: {}".format(vnf_index))
+                self.logger.debug("\nGetting vnfr from database")
+                self.logger.debug("db_vnfr: {}".format(db_vnfr))
+                self.logger.debug("\nGetting vnfd from database")
+                self.logger.debug("db_vnfd: {}".format(db_vnfd))
+
+                scaling_info["kdu-create"] = {}
+
+                for kdu_name in received_kdus:
+                    self.logger.debug("Trying to find kdu: {}".format(kdu_name))
+
+                    kdu = get_kdu(db_vnfd, kdu_name)
+                    self.logger.debug("kdu: {}".format(kdu))
+
+                    if not kdu:
+                        continue
+
+                    if not scaling_info["kdu-create"].get(kdu_name, None):
+                        scaling_info["kdu-create"][kdu_name] = []
+
+                    kdur = get_kdur(db_vnfr, kdu_name)
+                    self.logger.debug("kdur: {}".format(kdur))
+                    if kdur.get("helm-chart"):
+                        k8s_cluster_type = "helm-chart-v3"
+                    elif kdur.get("juju-bundle"):
+                        k8s_cluster_type = "juju-bundle"
+                    else:
+                        raise LcmException(
+                            "kdu type for kdu='{}.{}' is neither helm-chart nor "
+                            "juju-bundle. Maybe an old NBI version is running".format(
+                                db_vnfr["member-vnf-index-ref"], kdur["kdu-name"]
+                            )
+                        )
+
+                    deployed_kdu, _ = get_deployed_kdu(
+                        nsr_deployed, kdu_name, vnf_index
+                    )
+                    if deployed_kdu is None:
+                        raise LcmException(
+                            "KDU '{}' for vnf '{}' not deployed".format(
+                                kdu_name, vnf_index
+                            )
+                        )
+                    self.logger.debug("deployed_kdu: {}".format(deployed_kdu))
+
+                    kdu_instance = deployed_kdu.get("kdu-instance")
+                    self.logger.debug("kdu_instance: {}".format(kdu_instance))
+
+                    vca_scaling_info.append(
+                        {
+                            "osm_kdu_id": kdu_name,
+                            "member-vnf-index": vnf_index,
+                            "type": "install",
+                        }
+                    )
+                    scaling_info["kdu-create"][kdu_name].append(
+                        {
+                            "member-vnf-index": vnf_index,
+                            "type": "install",
+                            "k8s-cluster-type": k8s_cluster_type,
+                            "params": parse_yaml_strings(json.loads(kdur.get("additionalParams"))),
+                            "namespace": kdur.get("k8s-namespace"),
+                            "node-selector": kdur.get("node-selector")
+                        }
+                    )
+                nb_scale_op = 0
+                self.logger.debug("===========================\n\n")
                 
 
             # update VDU_SCALING_INFO with the VDUs to delete ip_addresses
             vdu_delete = copy(scaling_info.get("vdu-delete"))
-            if scaling_info["scaling_direction"] == "IN":
+            if scaling_info.get("scaling_direction") == "IN":
                 for vdur in reversed(db_vnfr["vdur"]):
                     if vdu_delete.get(vdur["vdu-id-ref"]):
                         vdu_delete[vdur["vdu-id-ref"]] -= 1
@@ -6973,7 +7043,7 @@ class NsLcm(LcmBase):
 
             # PRE-SCALE BEGIN
             step = "Executing pre-scale vnf-config-primitive"
-            if scaling_descriptor.get("scaling-config-action"):
+            if scaling_descriptor and scaling_descriptor.get("scaling-config-action"):
                 for scaling_config_action in scaling_descriptor[
                     "scaling-config-action"
                 ]:
@@ -7339,7 +7409,7 @@ class NsLcm(LcmBase):
             # POST-SCALE BEGIN
             # execute primitive service POST-SCALING
             step = "Executing post-scale vnf-config-primitive"
-            if scaling_descriptor.get("scaling-config-action"):
+            if scaling_descriptor and scaling_descriptor.get("scaling-config-action"):
                 for scaling_config_action in scaling_descriptor[
                     "scaling-config-action"
                 ]:
@@ -7657,6 +7727,7 @@ class NsLcm(LcmBase):
     async def _scale_kdu(
         self, logging_text, nsr_id, nsr_deployed, db_vnfd, vca_id, scaling_info
     ):
+        self.logger.debug("\n\n===========================\nScaling KDU\n===========================")
         _scaling_info = scaling_info.get("kdu-create") or scaling_info.get("kdu-delete")
         for kdu_name in _scaling_info:
             for kdu_scaling_info in _scaling_info[kdu_name]:
@@ -7666,7 +7737,7 @@ class NsLcm(LcmBase):
                 cluster_uuid = deployed_kdu["k8scluster-uuid"]
                 kdu_instance = deployed_kdu["kdu-instance"]
                 kdu_model = deployed_kdu.get("kdu-model")
-                scale = int(kdu_scaling_info["scale"])
+                scale = int(kdu_scaling_info.get("scale")) if "scale" in kdu_scaling_info else None
                 k8s_cluster_type = kdu_scaling_info["k8s-cluster-type"]
 
                 db_dict = {
@@ -7674,14 +7745,16 @@ class NsLcm(LcmBase):
                     "filter": {"_id": nsr_id},
                     "path": "_admin.deployed.K8s.{}".format(index),
                 }
-
+                
                 step = "scaling application {}".format(
-                    kdu_scaling_info["resource-name"]
+                    kdu_scaling_info["resource-name"] if "resource-name" in kdu_scaling_info else kdu_name
                 )
                 self.logger.debug(logging_text + step)
 
-                if kdu_scaling_info["type"] == "delete":
+                if kdu_scaling_info["type"] == "delete" or kdu_scaling_info["type"] == "uninstall":
+                    self.logger.debug("DELETING KDU {}".format(kdu_name))
                     kdu_config = get_configuration(db_vnfd, kdu_name)
+                    self.logger.debug("kdu_config {}".format(kdu_config))
                     if (
                         kdu_config
                         and kdu_config.get("terminate-config-primitive")
@@ -7716,23 +7789,54 @@ class NsLcm(LcmBase):
                                 * self.timeout.primitive_outer_factor,
                             )
 
-                await asyncio.wait_for(
-                    self.k8scluster_map[k8s_cluster_type].scale(
-                        kdu_instance=kdu_instance,
-                        scale=scale,
-                        resource_name=kdu_scaling_info["resource-name"],
-                        total_timeout=self.timeout.scale_on_error,
-                        vca_id=vca_id,
-                        cluster_uuid=cluster_uuid,
-                        kdu_model=kdu_model,
-                        atomic=True,
-                        db_dict=db_dict,
-                    ),
-                    timeout=self.timeout.scale_on_error
-                    * self.timeout.scale_on_error_outer_factor,
-                )
+                if kdu_scaling_info["type"] == "uninstall":
+                    step = "uninstalling application"
+                    self.logger.debug(logging_text + step)
+                    await asyncio.wait_for(
+                        self.k8scluster_map[k8s_cluster_type].uninstall(
+                            cluster_uuid=cluster_uuid,
+                            kdu_instance=kdu_instance,
+                        ),
+                        timeout=self.timeout.scale_on_error
+                        * self.timeout.scale_on_error_outer_factor,
+                    )
+                elif kdu_scaling_info["type"] == "install":
+                    step = "installing application"
+                    self.logger.debug(logging_text + step)
+                    await asyncio.wait_for(
+                        self.k8scluster_map[k8s_cluster_type].install(
+                            cluster_uuid=cluster_uuid,
+                            kdu_instance=kdu_instance,
+                            kdu_model=kdu_model,
+                            atomic=True,
+                            timeout=self.timeout.scale_on_error,
+                            params=kdu_scaling_info.get("params", None),
+                            db_dict=db_dict,
+                            kdu_name=kdu_name,
+                            namespace=kdu_scaling_info.get("namespace", None),
+                            node_selector=kdu_scaling_info.get("node-selector", None),
+                        ),
+                        timeout=self.timeout.scale_on_error
+                        * self.timeout.scale_on_error_outer_factor,
+                    )
+                else:
+                    await asyncio.wait_for(
+                        self.k8scluster_map[k8s_cluster_type].scale(
+                            kdu_instance=kdu_instance,
+                            scale=scale,
+                            resource_name=kdu_scaling_info["resource-name"],
+                            total_timeout=self.timeout.scale_on_error,
+                            vca_id=vca_id,
+                            cluster_uuid=cluster_uuid,
+                            kdu_model=kdu_model,
+                            atomic=True,
+                            db_dict=db_dict,
+                        ),
+                        timeout=self.timeout.scale_on_error
+                        * self.timeout.scale_on_error_outer_factor,
+                    )
 
-                if kdu_scaling_info["type"] == "create":
+                if kdu_scaling_info["type"] == "create" or kdu_scaling_info["type"] == "install":
                     kdu_config = get_configuration(db_vnfd, kdu_name)
                     if (
                         kdu_config
@@ -7763,6 +7867,7 @@ class NsLcm(LcmBase):
                                 ),
                                 timeout=600,
                             )
+        self.logger.debug("===========================\n\n")
 
     async def _scale_ng_ro(
         self, logging_text, db_nsr, db_nslcmop, db_vnfr, vdu_scaling_info, stage
