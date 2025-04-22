@@ -6898,7 +6898,7 @@ class NsLcm(LcmBase):
                     if not kdu:
                         continue
 
-                    deployed_kdu, _ = get_deployed_kdu(
+                    deployed_kdu, deployed_kdu_index = get_deployed_kdu(
                         nsr_deployed, kdu_name, vnf_index
                     )
                     if deployed_kdu is None or not deployed_kdu.get("enable"):
@@ -6942,6 +6942,12 @@ class NsLcm(LcmBase):
                             "k8s-cluster-type": k8s_cluster_type,
                         }
                     )
+
+                    db_nsr_update["_admin.deployed.K8s.{}.enable".format(deployed_kdu_index)] = False
+                    db_nsr_update["_admin.deployed.K8s.{}.detailed-status".format(deployed_kdu_index)] = "disabled"
+                    db_nsr_update["_admin.deployed.K8s.{}.operation".format(deployed_kdu_index)] = "uninstall"
+                    db_nsr_update["_admin.deployed.K8s.{}.status".format(deployed_kdu_index)] = "Uninstall complete"
+
                 nb_scale_op = 0
                 self.logger.debug("===========================\n\n")
             
@@ -6983,7 +6989,7 @@ class NsLcm(LcmBase):
                             )
                         )
 
-                    deployed_kdu, _ = get_deployed_kdu(
+                    deployed_kdu, deployed_kdu_index = get_deployed_kdu(
                         nsr_deployed, kdu_name, vnf_index
                     )
                     if deployed_kdu is None:
@@ -7014,6 +7020,9 @@ class NsLcm(LcmBase):
                             "node-selector": kdur.get("node-selector")
                         }
                     )
+
+                    db_nsr_update["_admin.deployed.K8s.{}.enable".format(deployed_kdu_index)] = True
+
                 nb_scale_op = 0
                 self.logger.debug("===========================\n\n")
                 
