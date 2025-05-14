@@ -6965,6 +6965,7 @@ class NsLcm(LcmBase):
 
                 for kdu_name in received_kdus:
                     self.logger.debug("Trying to find kdu: {}".format(kdu_name))
+                    node_selector = db_nslcmop["operationParams"]["scaleKduData"].get("node-selector") or kdur.get("node-selector", None)
 
                     kdu = get_kdu(db_vnfd, kdu_name)
                     self.logger.debug("kdu: {}".format(kdu))
@@ -7017,11 +7018,12 @@ class NsLcm(LcmBase):
                             "k8s-cluster-type": k8s_cluster_type,
                             "params": parse_yaml_strings(json.loads(kdur.get("additionalParams"))),
                             "namespace": kdur.get("k8s-namespace"),
-                            "node-selector": kdur.get("node-selector")
+                            "node-selector": node_selector,
                         }
                     )
 
                     db_nsr_update["_admin.deployed.K8s.{}.enable".format(deployed_kdu_index)] = True
+                    db_nsr_update["_admin.deployed.K8s.{}.node-selector".format(deployed_kdu_index)] = node_selector
 
                 nb_scale_op = 0
                 self.logger.debug("===========================\n\n")

@@ -601,6 +601,7 @@ ns_scale = {
                 "scaleKduType": {"enum": ["DISABLE", "ENABLE"]},
                 "member-vnf-index": name_schema,
                 "kdus-name": nameshort_list_schema,
+                "node-selector": node_selector_schema,
             },
             "required": ["scaleKduType", "member-vnf-index", "kdus-name"],
             "additionalProperties": False,
