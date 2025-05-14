@@ -8218,7 +8218,9 @@ class NsLcm(LcmBase):
                 )
 
             elif "targetHostK8sLabels" in target:
-                await self.k8sclusterhelm3.migrate(nsr_id, target)
+                status = await self.k8sclusterhelm3.migrate(nsr_id, target)
+                if status:
+                    db_nsr_update["_admin.deployed.K8s.{}.node-selector".format(target["vdu"].get("vduCountIndex", 0))] = target["targetHostK8sLabels"]
 
         except (ROclient.ROClientException, DbException, LcmException) as e:
             self.logger.error("Exit Exception {}".format(e))
@@ -8253,6 +8255,7 @@ class NsLcm(LcmBase):
                 operation_state=nslcmop_operation_state,
                 other_update=db_nslcmop_update,
             )
+            self.update_db_2("nsrs", nsr_id, db_nsr_update)
             if nslcmop_operation_state:
                 try:
                     msg = {
