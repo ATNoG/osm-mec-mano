@@ -7016,7 +7016,7 @@ class NsLcm(LcmBase):
                             "member-vnf-index": vnf_index,
                             "type": "install",
                             "k8s-cluster-type": k8s_cluster_type,
-                            "params": parse_yaml_strings(json.loads(kdur.get("additionalParams"))),
+                            "params": parse_yaml_strings(json.loads(kdur.get("additionalParams", "{}") or "{}")),
                             "namespace": kdur.get("k8s-namespace"),
                             "node-selector": node_selector,
                         }
