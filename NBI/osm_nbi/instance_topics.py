@@ -1534,13 +1534,6 @@ class NsLcmOpTopic(BaseTopic):
             )
 
     def _check_scale_ns_operation(self, indata, nsr):
-        self.logger.info(
-            "Validating scale operation for ns instance: {}".format(nsr["_id"])
-        )
-        self.logger.info(
-            "indata: {}".format(json.dumps(indata, indent=4, sort_keys=True))
-        )
-
         if indata["scaleType"] == "SCALE_VNF":
             vnfd = self._get_vnfd_from_vnf_member_index(
                 indata["scaleVnfData"]["scaleByStepData"]["member-vnf-index"], nsr["_id"]

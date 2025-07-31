@@ -3591,10 +3591,7 @@ class NsLcm(LcmBase):
                     )
                     k8s_instance_info["namespace"] = kdu_instance
 
-            self.logger.debug(f"Installing k8s instance {kdu_instance} with params {k8params}")
-            self.logger.debug(f"k8s_instance_info: {k8s_instance_info}")
             enable = k8s_instance_info["enable"]
-            self.logger.debug(f"Enable: {enable}")
             if enable:
                 await self.k8scluster_map[k8sclustertype].install(
                     cluster_uuid=k8s_instance_info["k8scluster-uuid"],
@@ -3819,7 +3816,6 @@ class NsLcm(LcmBase):
             for vnfr_data in db_vnfrs.values():
                 vca_id = self.get_vca_id(vnfr_data, {})
                 for kdu_index, kdur in enumerate(get_iterable(vnfr_data, "kdur")):
-                    self.logger.debug("kdur: {}".format(kdur))
                     # Step 0: Prepare and set parameters
                     desc_params = parse_yaml_strings(kdur.get("additionalParams"))
                     vnfd_id = vnfr_data.get("vnfd-id")
@@ -6878,23 +6874,10 @@ class NsLcm(LcmBase):
                             }
                         )
             elif scaling_type == "DISABLE":
-                self.logger.debug("\n\n===========================\nDisable KDU\n===========================")
-                self.logger.debug("\nGetting nsr from database")
-                self.logger.debug("db_nsr: {}".format(db_nsr))
-                self.logger.debug("vnf_index: {}".format(vnf_index))
-                self.logger.debug("\nGetting vnfr from database")
-                self.logger.debug("db_vnfr: {}".format(db_vnfr))
-                self.logger.debug("\nGetting vnfd from database")
-                self.logger.debug("db_vnfd: {}".format(db_vnfd))
-
                 scaling_info["kdu-delete"] = {}
 
                 for kdu_name in received_kdus:
-                    self.logger.debug("Trying to find kdu: {}".format(kdu_name))
-
                     kdu = get_kdu(db_vnfd, kdu_name)
-                    self.logger.debug("kdu: {}".format(kdu))
-
                     if not kdu:
                         continue
 
@@ -6926,7 +6909,6 @@ class NsLcm(LcmBase):
                         )
 
                     kdu_instance = deployed_kdu.get("kdu-instance")
-                    self.logger.debug("kdu_instance: {}".format(kdu_instance))
 
                     vca_scaling_info.append(
                         {
@@ -6949,26 +6931,13 @@ class NsLcm(LcmBase):
                     db_nsr_update["_admin.deployed.K8s.{}.status".format(deployed_kdu_index)] = "Uninstall complete"
 
                 nb_scale_op = 0
-                self.logger.debug("===========================\n\n")
             
             elif scaling_type == "ENABLE":
-                self.logger.debug("\n\n===========================\nEnable KDU\n===========================")
-                self.logger.debug("\nGetting nsr from database")
-                self.logger.debug("db_nsr: {}".format(db_nsr))
-                self.logger.debug("vnf_index: {}".format(vnf_index))
-                self.logger.debug("\nGetting vnfr from database")
-                self.logger.debug("db_vnfr: {}".format(db_vnfr))
-                self.logger.debug("\nGetting vnfd from database")
-                self.logger.debug("db_vnfd: {}".format(db_vnfd))
-
                 scaling_info["kdu-create"] = {}
 
                 for kdu_name in received_kdus:
-                    self.logger.debug("Trying to find kdu: {}".format(kdu_name))
                     node_selector = db_nslcmop["operationParams"]["scaleKduData"].get("node-selector") or kdur.get("node-selector", None)
-
                     kdu = get_kdu(db_vnfd, kdu_name)
-                    self.logger.debug("kdu: {}".format(kdu))
 
                     if not kdu:
                         continue
@@ -6977,7 +6946,6 @@ class NsLcm(LcmBase):
                         scaling_info["kdu-create"][kdu_name] = []
 
                     kdur = get_kdur(db_vnfr, kdu_name)
-                    self.logger.debug("kdur: {}".format(kdur))
                     if kdur.get("helm-chart"):
                         k8s_cluster_type = "helm-chart-v3"
                     elif kdur.get("juju-bundle"):
@@ -6999,10 +6967,8 @@ class NsLcm(LcmBase):
                                 kdu_name, vnf_index
                             )
                         )
-                    self.logger.debug("deployed_kdu: {}".format(deployed_kdu))
 
                     kdu_instance = deployed_kdu.get("kdu-instance")
-                    self.logger.debug("kdu_instance: {}".format(kdu_instance))
 
                     vca_scaling_info.append(
                         {
@@ -7026,7 +6992,6 @@ class NsLcm(LcmBase):
                     db_nsr_update["_admin.deployed.K8s.{}.node-selector".format(deployed_kdu_index)] = node_selector
 
                 nb_scale_op = 0
-                self.logger.debug("===========================\n\n")
                 
 
             # update VDU_SCALING_INFO with the VDUs to delete ip_addresses
@@ -7738,7 +7703,6 @@ class NsLcm(LcmBase):
     async def _scale_kdu(
         self, logging_text, nsr_id, nsr_deployed, db_vnfd, vca_id, scaling_info
     ):
-        self.logger.debug("\n\n===========================\nScaling KDU\n===========================")
         _scaling_info = scaling_info.get("kdu-create") or scaling_info.get("kdu-delete")
         for kdu_name in _scaling_info:
             for kdu_scaling_info in _scaling_info[kdu_name]:
@@ -7763,9 +7727,7 @@ class NsLcm(LcmBase):
                 self.logger.debug(logging_text + step)
 
                 if kdu_scaling_info["type"] == "delete" or kdu_scaling_info["type"] == "uninstall":
-                    self.logger.debug("DELETING KDU {}".format(kdu_name))
                     kdu_config = get_configuration(db_vnfd, kdu_name)
-                    self.logger.debug("kdu_config {}".format(kdu_config))
                     if (
                         kdu_config
                         and kdu_config.get("terminate-config-primitive")
@@ -7878,7 +7840,6 @@ class NsLcm(LcmBase):
                                 ),
                                 timeout=600,
                             )
-        self.logger.debug("===========================\n\n")
 
     async def _scale_ng_ro(
         self, logging_text, db_nsr, db_nslcmop, db_vnfr, vdu_scaling_info, stage
