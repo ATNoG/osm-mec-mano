@@ -264,6 +264,11 @@ EOF"
     if [ -n "${INSTALL_JUJU}" ]; then
         OSM_HELM_OPTS="-f ${OSM_HELM_WORK_DIR}/osm-values.yaml ${OSM_HELM_OPTS}"
     fi
+
+    # Dependency update before installing helm chart
+    echo "helm dependency update ${OSM_DEVOPS}/installers/helm/osm"
+    helm dependency update ${OSM_DEVOPS}/installers/helm/osm || FATAL_TRACK osm_helm_chart "Failed updating osm helm chart dependencies"
+    # Deploy helm chart
     echo "helm upgrade --install -n $OSM_NAMESPACE --create-namespace $OSM_NAMESPACE $OSM_DEVOPS/installers/helm/osm ${OSM_HELM_OPTS}"
     helm upgrade --install -n $OSM_NAMESPACE --create-namespace $OSM_NAMESPACE $OSM_DEVOPS/installers/helm/osm ${OSM_HELM_OPTS}
     # Override existing values.yaml with the final values.yaml used to install OSM

@@ -201,6 +201,18 @@ grafana:
 
 kafka:
   enabled: true
+  image:
+    repository: bitnamilegacy/kafka
+  externalAccess:
+      image:
+        repository: bitnamilegacy/kubectl
+  volumePermissions:
+    image:
+      repository: bitnamilegacy/os-shell
+  metrics:
+    jmx:
+      image:
+        repository: bitnamilegacy/jmx-exporter
   listeners:
     client:
       protocol: "PLAINTEXT"
@@ -268,7 +280,14 @@ mon:
 mysql:
   enabled: false
   image:
+    repository: bitnamilegacy/mysql
     tag: "8.1-debian-11"
+  volumePermissions:
+    image:
+      repository: bitnamilegacy/os-shell
+  metrics:
+    image:
+      repository: bitnamilegacy/mysqld-exporter
   fullnameOverride: "mysql"
 
 nbi:

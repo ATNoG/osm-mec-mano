@@ -64,6 +64,19 @@ webserver:
       - name: airflow-ui
         port: "{{ .Values.ports.airflowUI }}"
         targetPort: "{{ .Values.ports.airflowUI }}"
+
+postgresql:
+  image:
+    repository: bitnamilegacy/postgresql
+        
+  volumePermissions:
+    image:
+      repository: bitnamilegacy/bitnami-shell
+
+  metrics:
+    image:
+      repository: bitnamilegacy/mongodb-exporter
+
 workers:
   persistence:
     size: 2Gi
