@@ -177,14 +177,14 @@ function install_osmclient(){
     sudo add-apt-repository -y "deb [arch=amd64] $CLIENT_REPOSITORY_BASE/$CLIENT_RELEASE $CLIENT_REPOSITORY osmclient IM"
     sudo apt-get -y update
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y python3-pip
-    sudo -H LC_ALL=C python3 -m pip install -U pip
+    sudo -H LC_ALL=C python3 -m pip install --break-system-packages -U pip
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y python3-osm-im python3-osmclient
     if [ -f /usr/lib/python3/dist-packages/osm_im/requirements.txt ]; then
-        python3 -m pip install -r /usr/lib/python3/dist-packages/osm_im/requirements.txt
+        python3 -m pip install --break-system-packages -r /usr/lib/python3/dist-packages/osm_im/requirements.txt
     fi
     if [ -f /usr/lib/python3/dist-packages/osmclient/requirements.txt ]; then
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libmagic1
-        python3 -m pip install -r /usr/lib/python3/dist-packages/osmclient/requirements.txt
+        python3 -m pip install --break-system-packages -r /usr/lib/python3/dist-packages/osmclient/requirements.txt
     fi
     echo -e "\nOSM client installed"
     echo "You can get the OSM NBI endpoint using the following command"

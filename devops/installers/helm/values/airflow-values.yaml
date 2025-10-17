@@ -64,6 +64,10 @@ webserver:
       - name: airflow-ui
         port: "{{ .Values.ports.airflowUI }}"
         targetPort: "{{ .Values.ports.airflowUI }}"
+  livenessProbe:
+    initialDelaySeconds: 120
+  readinessProbe:
+    initialDelaySeconds: 120
 
 postgresql:
   image:
