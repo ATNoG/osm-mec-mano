@@ -123,8 +123,8 @@ if [ -n "${OSM_BEHIND_PROXY}" ]; then
 fi
 
 # Dependency update before installing helm chart
-echo "helm dependency update ${OSM_DEVOPS}/installers/helm/osm"
-helm dependency update ${OSM_DEVOPS}/installers/helm/osm
+echo "helm dependency update ${HERE}/installers/helm/osm"
+helm dependency update ${HERE}/installers/helm/osm
 # Deploy helm chart
 echo "helm upgrade --install -n $OSM_NAMESPACE --create-namespace $OSM_HELM_RELEASE ${HERE}/helm/osm ${OSM_HELM_OPTS}"
 helm upgrade --install -n $OSM_NAMESPACE --create-namespace $OSM_HELM_RELEASE ${HERE}/helm/osm ${OSM_HELM_OPTS}

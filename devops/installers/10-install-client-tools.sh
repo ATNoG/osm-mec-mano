@@ -135,7 +135,7 @@ OSM_IM_VERSION=${OSM_IM_VERSION:-"master"}
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-setuptools python3-dev python3-pip
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libmagic1
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y make
-sudo -H python3 -m pip install --break-system-packages -U pip
+sudo -H python3 -m pip install --break-system-packages --ignore-installed -U pip
 # Install OSM IM and its dependencies via pip
 python3 -m pip install --break-system-packages -r "https://osm.etsi.org/gitweb/?p=osm/IM.git;a=blob_plain;f=requirements.txt;hb=${OSM_IM_VERSION}"
 # Path needs to include $HOME/.local/bin in order to use pyang
