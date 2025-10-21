@@ -32,6 +32,7 @@ global:
   imagePullSecrets: []
   nameOverride: ""
   fullnameOverride: ""
+  # ingressClassName: "nginx"
 
   serviceAccount:
     # Specifies whether a service account should be created
@@ -65,6 +66,8 @@ global:
     gitUser: osm-developer
     # gitBaseUrl: http://git.<IP_ADDRESS>.nip.io
     # pubkey: AGEKEY
+    # fleetRepoUrl: http://git.<IP_ADDRESS>.nip.io
+    # swcatalogsRepoUrl: http://git.<IP_ADDRESS>.nip.io
 
   podAnnotations: {}
 
@@ -88,10 +91,96 @@ global:
     # HTTPS_PROXY: <HTTPS_PROXY>
     # NO_PROXY: <NO_PROXY>
 
-  oldServiceAssurance: false
-
 airflow:
   enabled: true
+  # postgresql:
+  #   image:
+  #     repository: bitnamilegacy/postgresql
+          
+  #   volumePermissions:
+  #     image:
+  #       repository: bitnamilegacy/bitnami-shell
+
+  #   metrics:
+  #     image:
+  #       repository: bitnamilegacy/mongodb-exporter
+  fullnameOverride: "airflow"
+  config:
+    core:
+      parallelism: 4
+      dag_concurrency: 2
+      max_active_tasks_per_dag: 2
+      worker_concurrency: 2
+      dags_folder: "/home/airflow/.local/lib/python3.10/site-packages/osm_ngsa"
+  defaultAirflowRepository: opensourcemano/airflow
+  defaultAirflowTag: "testing-daily"
+  executor: LocalExecutor
+  extraEnv: |
+    - name: AIRFLOW__API__AUTH_BACKENDS
+      value: 'airflow.api.auth.backend.basic_auth'
+    - name: AIRFLOW__LOGGING__LOGGING_LEVEL
+      value: 'INFO'
+    - name: OSMMON_DATABASE_COMMONKEY
+      valueFrom:
+        secretKeyRef:
+          name: osm-secret
+          key: OSM_DATABASE_COMMONKEY
+  # extraEnvFrom: |
+  #   - secretRef:
+  #       name: ngsa-secret
+  ingress:
+    web:
+      enabled: True
+      # hosts:
+      #   - name: "localhost"
+      ingressClassName: nginx
+  # scheduler:
+  #   resources:
+  #     requests:
+  #       memory: 512Mi
+  #       cpu: 250m
+  #     limits:
+  #       memory: 1Gi
+  #       cpu: 500m
+  webserverSecretKeySecretName: airflow-webserver-secret
+  webserver:
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 250m
+      limits:
+        memory: 1Gi
+        cpu: 500m
+    service:
+      type: ClusterIP
+      ports:
+        - name: airflow-ui
+          port: "{{ .Values.ports.airflowUI }}"
+          targetPort: "{{ .Values.ports.airflowUI }}"
+    livenessProbe:
+      initialDelaySeconds: 120
+    readinessProbe:
+      initialDelaySeconds: 120
+  workers:
+    persistence:
+      size: 2Gi
+    replicas: 1
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 250m
+      limits:
+        memory: 1Gi
+        cpu: 500m
+    logGroomerSidecar:
+      retentionDays: 7
+      resources:
+        limits:
+          cpu: 100m
+          memory: 128Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi
 
 alertmanager:
   enabled: true
@@ -201,35 +290,13 @@ grafana:
 
 kafka:
   enabled: true
-  image:
-    repository: bitnamilegacy/kafka
-  externalAccess:
-    enabled: true
-    autoDiscovery:
-      enabled: true
-      image:
-        repository: bitnamilegacy/kubectl
-    controller:
-      service:
-        type: NodePort
-        nodePorts:
-          - 31999
-  serviceAccount:
-    create: true
-  volumePermissions:
-    image:
-      repository: bitnamilegacy/os-shell
-  metrics:
-    jmx:
-      image:
-        repository: bitnamilegacy/jmx-exporter
+  # image:
+  #   repository: bitnamilegacy/kafka
   listeners:
     client:
       protocol: "PLAINTEXT"
   fullnameOverride: "kafka"
   replicaCount: 1
-  rbac:
-    create: true
   controller:
     replicaCount: 1
     automountServiceAccountToken: true
@@ -239,6 +306,28 @@ kafka:
     heapOpts: -Xmx768m -Xms768m
   broker:
     automountServiceAccountToken: true
+  externalAccess:
+    enabled: true
+    autoDiscovery:
+      enabled: true
+      # image:
+      #   repository: bitnamilegacy/kubectl
+    controller:
+      service:
+        type: NodePort
+        nodePorts:
+          - 31999
+  # volumePermissions:
+  #   image:
+  #     repository: bitnamilegacy/os-shell
+  # metrics:
+  #   jmx:
+  #     image:
+  #       repository: bitnamilegacy/jmx-exporter
+  serviceAccount:
+    create: true
+  rbac:
+    create: true
   extraConfigYaml:
     default.replication.factor: 1
     offsets.topic.replication.factor: 1
@@ -292,17 +381,54 @@ mon:
   # secretName: "mon-secret"
   config: {}
 
+mongodb:
+  enabled: true
+  # image:
+  #   repository: bitnamilegacy/mongodb
+  # tls:
+  #   image:
+  #     repository: bitnamilegacy/nginx
+  # externalAccess:
+  #   autoDiscovery:
+  #     image:
+  #       repository: bitnamilegacy/kubectl
+  # volumePermissions:
+  #   image:
+  #     repository: bitnamilegacy/bitnami-shell
+  # metrics:
+  #   image:
+  #     repository: bitnamilegacy/mongodb-exporter
+  fullnameOverride: "mongodb-k8s"
+  replicaCount: 1
+  service:
+    nameOverride: "mongodb-k8s"
+  auth:
+    enabled: false
+  architecture: "replicaset"
+  livenessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 10
+    successThreshold: 1
+  readinessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 10
+    successThreshold: 1
+
 mysql:
   enabled: false
   image:
-    repository: bitnamilegacy/mysql
+    # repository: bitnamilegacy/mysql
     tag: "8.1-debian-11"
-  volumePermissions:
-    image:
-      repository: bitnamilegacy/os-shell
-  metrics:
-    image:
-      repository: bitnamilegacy/mysqld-exporter
+  # volumePermissions:
+  #   image:
+  #     repository: bitnamilegacy/os-shell
+  # metrics:
+  #   image:
+  #     repository: bitnamilegacy/mysqld-exporter
   fullnameOverride: "mysql"
 
 nbi:
@@ -343,26 +469,6 @@ ngui:
     # repository: opensourcemano/ng-ui
     # tag: "testing-daily"
   # replicaCount: 1
-
-# pla module is disabled by default unless global.oldServiceAssurance and pla.enabled are set to true
-pla:
-  enabled: false
-  # logLevel: DEBUG
-  image: {}
-    # repository: opensourcemano/pla
-    # tag: "testing-daily"
-  # replicaCount: 1
-
-# pol module is disabled by default unless global.oldServiceAssurance and pol.enabled are set to true
-pol:
-  enabled: true
-  # logLevel: DEBUG
-  image: {}
-    # repository: opensourcemano/pol
-    # tag: "testing-daily"
-  # replicaCount: 1
-  useOsmSecret: true
-  # secretName: "pol-secret"
 
 prometheus:
   enabled: true
@@ -623,3 +729,6 @@ webhookTranslator:
   #   type: NodePort
   #   nodePort: 9998
   #   port: 9998
+  config:
+    airflowHost: "osm-webserver"
+    # airflowPort: "8080"

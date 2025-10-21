@@ -1,0 +1,113 @@
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: anyuid-seccomp
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegeEscalation: true
+allowPrivilegedContainer: false
+allowedCapabilities: null
+defaultAddCapabilities: null
+fsGroup:
+  type: RunAsAny
+groups:
+- system:cluster-admins
+priority: 10
+readOnlyRootFilesystem: false
+requiredDropCapabilities:
+- MKNOD
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: MustRunAs
+seccompProfiles:
+- runtime/default
+supplementalGroups:
+  type: RunAsAny
+users: []
+volumes:
+- configMap
+- csi
+- downwardAPI
+- emptyDir
+- ephemeral
+- persistentVolumeClaim
+- projected
+- secret
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: osm-scc-anyuid
+  namespace: osm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: osm
+  - kind: ServiceAccount
+    name: osm
+    namespace: osm
+  - kind: ServiceAccount
+    name: airflow-statsd
+    namespace: osm
+  - kind: ServiceAccount
+    name: airflow-triggerer
+    namespace: osm
+  - kind: ServiceAccount
+    name: airflow-webserver
+    namespace: osm
+  - kind: ServiceAccount
+    name: airflow-scheduler
+    namespace: osm
+  - kind: ServiceAccount
+    name: airflow-create-user-job
+    namespace: osm
+  - kind: ServiceAccount
+    name: pushgateway-prometheus-pushgateway
+    namespace: osm
+  - kind: ServiceAccount
+    name: mongodb-k8s
+    namespace: osm
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: osm
+  - kind: ServiceAccount
+    name: alertmanager
+    namespace: osm
+  - kind: ServiceAccount
+    name: airflow-migrate-database-job
+    namespace: osm
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: osm-scc-anyuid-seccomp
+  namespace: osm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid-seccomp
+subjects:
+  - kind: ServiceAccount
+    name: grafana
+    namespace: osm

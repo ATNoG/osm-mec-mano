@@ -1,0 +1,218 @@
+#######################################################################################
+# Copyright ETSI Contributors and Others.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#######################################################################################
+
+- apiVersion: config.kubernetes.io/v1
+  kind: ResourceList
+  items:
+  - apiVersion: kustomize.toolkit.fluxcd.io/v1
+    kind: Kustomization
+    metadata:
+      name: database-kustomization-myapp01
+      namespace: flux-system
+      annotations:
+        config.kubernetes.io/index: '0'
+        config.kubernetes.io/path: ks-database.yaml
+        internal.config.kubernetes.io/index: '0'
+        internal.config.kubernetes.io/path: ks-database.yaml
+        internal.config.kubernetes.io/seqindent: compact
+    spec:
+      interval: 1h0m0s
+      path: apps/example1/manifests/main-pattern/database-manifests
+      prune: true
+      sourceRef:
+        kind: GitRepository
+        name: sw-catalogs
+        namespace: flux-system
+      targetNamespace: app-namespace
+      postBuild:
+        substitute:
+          appname: myapp01
+          appnamespace: app-namespace
+      wait: true
+      patches:
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-myapp01
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/values
+            value:
+              key1: value1
+              key2: value2
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-myapp01
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/valuesFrom/-
+            value:
+              kind: ConfigMap
+              name: postgres-operator-cm-myapp01
+              key: values.yaml
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-myapp01
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/valuesFrom/-
+            value:
+              kind: Secret
+              name: postgres-operator-secret-myapp01
+              key: values.yaml
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-ui-myapp01
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/values
+            value:
+              key1: value1
+              key2: value2
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-ui-myapp01
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/valuesFrom/-
+            value:
+              kind: ConfigMap
+              name: postgres-operator-ui-cm-myapp01
+              key: values.yaml
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-ui-myapp01
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/valuesFrom/-
+            value:
+              kind: Secret
+              name: postgres-operator-ui-secret-myapp01
+              key: values.yaml
+  - apiVersion: kustomize.toolkit.fluxcd.io/v1
+    kind: Kustomization
+    metadata:
+      name: main-kustomization-myapp01
+      namespace: flux-system
+      annotations:
+        config.kubernetes.io/index: '0'
+        config.kubernetes.io/path: ks-main.yaml
+        internal.config.kubernetes.io/index: '0'
+        internal.config.kubernetes.io/path: ks-main.yaml
+        internal.config.kubernetes.io/seqindent: compact
+    spec:
+      interval: 1h0m0s
+      path: apps/example1/manifests/main-pattern/main-brick-manifests
+      prune: true
+      sourceRef:
+        kind: GitRepository
+        name: sw-catalogs
+        namespace: flux-system
+      targetNamespace: app-namespace
+      postBuild:
+        substitute:
+          app_name: myapp01
+      wait: true
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: postgres-operator-cm-myapp01
+      namespace: app-namespace
+      annotations:
+        config.kubernetes.io/path: postgres-operator-cm-myapp01.yaml
+        internal.config.kubernetes.io/path: postgres-operator-cm-myapp01.yaml
+    data:
+      values.yaml: |-
+        cm-key1: cm-value1
+        cm-key2: cm-value2
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: postgres-operator-secret-myapp01
+      namespace: app-namespace
+      annotations:
+        config.kubernetes.io/path: postgres-operator-secret-myapp01.yaml
+        internal.config.kubernetes.io/path: postgres-operator-secret-myapp01.yaml
+    data:
+      values.yaml: ENC[AES256_GCM,data:wzm5y3kpbk+ZVM2TsNd6D4rmEZ7FU5jxM3dZiGILjZ7Hy00oS0ua9nwc0WU+IwSz0S4m7RiETYRnWITELpq0xoogCXRVIz7SkOivWE6/lv+H0SgQOqZ0iDHZgE/kly8S61kh1QGAeCCUZcpUyXwjgZ1S/iwZqAlVl2cizkGvYMMdgJAGBqTrXakM6LH10J5JBZX/05Cy9Y1rSzGDl6XsJwpnj0znyYIAGsq97nsjctzVGUX0TTIvE03de+T5ZB/nxOZrpcsUSbrbHBj4J5/uijOzV4NCjZ6OV7PWl64fKlpVcLt8z5geO9RMVBT/WlhV,iv:bGxvvh4umOmM7iRHiu0i6lWjWeD1yOkhPGSiMGDgkq0=,tag:v0Og8/hjsEuPLB1wmXSWSw==,type:str]
+    sops:
+      kms: []
+      gcp_kms: []
+      azure_kv: []
+      hc_vault: []
+      age:
+      - recipient: age18juyaw9kvzgkpqx8kun2n7qtvqva6ajj7ulse435thkgnlfjhf2qj76h64
+        enc: |
+          -----BEGIN AGE ENCRYPTED FILE-----
+          YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHV3d4R2JzS0VmazdCUXBR
+          citpNE9uVmdGbm8vNWdCK3dQR2NObFRaQlVFCjJJZGU5b25pRC8zQ0NOT1J1eEcr
+          bzBzdHE5ZlpBelJaSnpLVGlhcmp3QUkKLS0tIC9Fam5DcTZHQ0pzK3o5N0o2MVJr
+          c3krQTlvU2FXckxxTUkraDBRMWJwd3cK0sd3dx5Arzh4XxJVUFOi1cPnF9UIsv18
+          VXKeyoIOK8pvPS5c4UvCTfBFdYs69Sg6+6FfbCoFJepaT+VfaM1XPA==
+          -----END AGE ENCRYPTED FILE-----
+      lastmodified: 2025-04-29T18:26:22Z
+      mac: ENC[AES256_GCM,data:io3iCpdT61n7ECEkyM2KhBgp9oZ49I2YBjuUA8HQSLyDDzFrNNeZh0bVOWI3HT89egkZDt8nmj8+A4Bx9sC666iBcqcFx+VuH//Db7SZXYJXFm1qNP+lt+3ic4fesJgYKG5ld+7FtB1ApKccmE7Ri0yrWGYsrMJh2aRK6T3VyzQ=,iv:9lvXUEPwIZxphwEc91QCPPSxkVNIiUAZWQWby502FJA=,tag:0IxYm+VLLKOoZ80FQlLspQ==,type:str]
+      pgp: []
+      encrypted_regex: ^(data|stringData)$
+      version: 3.8.1
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: postgres-operator-ui-cm-myapp01
+      namespace: app-namespace
+      annotations:
+        config.kubernetes.io/path: postgres-operator-ui-cm-myapp01.yaml
+        internal.config.kubernetes.io/path: postgres-operator-ui-cm-myapp01.yaml
+    data:
+      values.yaml: |-
+        cm-key1: cm-value1
+        cm-key2: cm-value2
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: postgres-operator-ui-secret-myapp01
+      namespace: app-namespace
+      annotations:
+        config.kubernetes.io/path: postgres-operator-ui-secret-myapp01.yaml
+        internal.config.kubernetes.io/path: postgres-operator-ui-secret-myapp01.yaml
+    data:
+      values.yaml: ENC[AES256_GCM,data:37zRz8FafCMe/cfZGI9Ojx+DP1Y09C5C4P6E4wkPZJfqb8brliWAzQ14cOHZgeOQBugcuguMLTacGz+QCDvU9u5ZFs9ouXY3pWbs9wa4Ywoaum8T2gK1edzEoQ9U0QG5wqndwti4p1wo8Im6+A/VOpFXcEGXdzSLfxcryTGA5EXBtwG9/SvhTvx6CCZGvWcNtjqjJjwNOOtFyJJFBuc7CrWFgYliSwwZ2q4INJhDTrrQ81zKDzdkW/ac+uapey/XQ3lYK56n7K+Z+hxoBJLYRfsRdtBCXxXpThfYXPu608WDHUcedjitATsk7NwA/F+mqmm1T5FO7ePspSaTZgvhBMi+OP1HyIgKbmiEhg==,iv:dVYZTjkNYAgNpFUvFTIiyEFM51tv45G1yp1NPG/xJKQ=,tag:xcrQZq1swfcjfPjcNgN0JQ==,type:str]
+    sops:
+      kms: []
+      gcp_kms: []
+      azure_kv: []
+      hc_vault: []
+      age:
+      - recipient: age18juyaw9kvzgkpqx8kun2n7qtvqva6ajj7ulse435thkgnlfjhf2qj76h64
+        enc: |
+          -----BEGIN AGE ENCRYPTED FILE-----
+          YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqUS9vaVRVbk9DTkpreVNU
+          Y0t6TW9sbk9Ua1hWSUdVa0hrOWVVSkZIbkVnCnpVcUpxdkQweWw1MjhBVldkaXVX
+          OTRlYW9jQ3ZxNnhiMGExanJYNU9oREkKLS0tIGl3U201ZmNPM2xaY0FyOWZsZGNs
+          aFBQTU1BK3BTSWZ6djFMRDFkbjkrYnMKX/Uo7ePikgbnOfewdHSmCXE4aMfZU0IQ
+          jr9ZlHVGPvaS6yy7fezVZOJI++nwF7fyXZfJW9mm0rSRBy5vnKQYNg==
+          -----END AGE ENCRYPTED FILE-----
+      lastmodified: 2025-04-29T18:26:22Z
+      mac: ENC[AES256_GCM,data:h0ZEFSy0jijGOmjKIFWi5GOfGYgSCWg2BNgMFXT2AwwR2j/xcJWBwFvKPzy7X028Onz0aNmnPa7hf4eI8HS2pp4FEeUbTp8Z+X8it01XDbhmXqnykeHRU40CaKtqaNBbT2uKa/jpT5KgZl+2mnLUL9VU1vlu7BFIQrYPPtOTxgI=,iv:cBSpvEZHFGEAVqWyXUF9OtmuwN4DM3nS3ZgJepUknZ0=,tag:W2utUcIePQpqHkZYV4FiFA==,type:str]
+      pgp: []
+      encrypted_regex: ^(data|stringData)$
+      version: 3.8.1

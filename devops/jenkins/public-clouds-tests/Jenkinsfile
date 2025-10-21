@@ -21,7 +21,7 @@ pipeline {
 
         // Parameters to define the specific OSM version to test
         // --> Defaults to latest stable version of Release FOURTEEN
-        string(defaultValue: 'https://osm-download.etsi.org/ftp/osm-16.0-sixteen/install_osm.sh', description: 'URL to OSM installer', name: 'INSTALLER_URL')
+        string(defaultValue: 'https://osm-download.etsi.org/ftp/osm-18.0-eighteen/install_osm.sh', description: 'URL to OSM installer', name: 'INSTALLER_URL')
         string(defaultValue: 'testing-daily', description: 'Release for OSM binaries (REPO_BASE)', name: 'REPO_BASE')
         string(defaultValue: 'testing-daily', description: 'OSM docker tag (DOCKER_TAG)', name: 'DOCKER_TAG')
         string(defaultValue: 'testing', description: 'Repository name for OSM packages (REPO_NAME)', name: 'REPO_NAME')

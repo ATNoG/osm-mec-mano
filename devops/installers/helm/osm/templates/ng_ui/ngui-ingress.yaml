@@ -24,12 +24,12 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ .Values.global.ingressClassName | default "nginx" }}
   rules:
 {{- if .Values.ngui.ingress.host }}
   - host: {{ .Values.ngui.ingress.host }}
 {{- else }}
-  - host: "{{ .Values.global.hostname }}"
+  - host: "gui.{{ .Values.global.hostname }}"
 {{- end }}
     http:
       paths:
@@ -45,7 +45,7 @@ spec:
     {{- if .Values.ngui.ingress.host }}
       - {{ .Values.ngui.ingress.host }}
     {{- else }}
-      - "nbi.{{ .Values.global.hostname }}"
+      - "gui.{{ .Values.global.hostname }}"
     {{- end }}
       secretName: ngui-cert
 {{- end }}

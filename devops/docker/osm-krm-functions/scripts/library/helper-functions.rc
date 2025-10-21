@@ -13,6 +13,7 @@
 #   limitations under the License.
 #
 
+
 # Convert input string to a safe name for K8s resources
 function safe_name() {
   local INPUT="$1"
@@ -379,6 +380,47 @@ function add_patch_to_kustomization() {
     "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${KUSTOMIZATION_NAME}\")"
 }
 
+function patch_add_value_as_list() {
+  local KEY_PATH="$1"
+  local VALUE="$2"
+  local TARGET_FILTERS="${3:-}"
+
+  yq "(.items[]${TARGET_FILTERS})${KEY_PATH} += [${VALUE}]"
+}
+
+function add_patch_to_kustomization_as_list() {
+  local KUSTOMIZATION_NAME="$1"
+  local PATCH_VALUE="$2"
+
+  local VALUE_AS_JSON=$(echo "$PATCH_VALUE" | yq -o json -I0)
+
+  patch_add_value_as_list \
+    ".spec.patches" \
+    "${VALUE_AS_JSON}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${KUSTOMIZATION_NAME}\")"
+}
+
+function add_component_to_kustomization_as_list() {
+  local KUSTOMIZATION_NAME="$1"
+  shift
+  local COMPONENT=("$@")
+
+  local COMPONENT_JSON=$(printf '"%s",' "${COMPONENT[@]}" | sed 's/,$//')
+
+  patch_add_value_as_list \
+    ".spec.components" \
+    "${COMPONENT_JSON}" \
+    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${KUSTOMIZATION_NAME}\")"
+}
+
+function add_config_to_kustomization() {
+  local KUSTOMIZATION_NAME="$1"
+
+  yq '
+    (.items[] | select(.kind == "Kustomization") | select(.metadata.name == "'"${KUSTOMIZATION_NAME}"'"))
+    .spec.postBuild.substituteFrom = [{"kind": "ConfigMap", "name": "'"${KUSTOMIZATION_NAME}"'-parameters"}]
+  '
+}
 
 # Helper function to produce a JSON Patch as specified in RFC 6902
 function as_json_patch() {
@@ -403,7 +445,7 @@ function full_json_patch() {
   local TARGET_NAME="$2"
   local OPERATION="$3"
   local PATCH_PATH="$4"
-  # Gathers all optional parameters for transformer funcion (if any) and puts them into an array for further use
+  # Gathers all optional parameters for transformer function (if any) and puts them into an array for further use
   local ALL_PARAMS=( "${@}" )
   local VALUES=( "${ALL_PARAMS[@]:4}" )
 
@@ -425,8 +467,9 @@ function full_json_patch() {
   # Wrap a full patch around, adding target specification
   local PATCH_FULL=$(
     yq --null-input ".target.kind = \"${TARGET_KIND}\", .target.name = \"${TARGET_NAME}\"" | \
-    yq ".patch = \"${PATCH_CONTENT}\"" | \
-    yq "[ . ]"
+    yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' - \
+      <(printf "patch: |-\n%s\n" "$(echo "${PATCH_CONTENT}" | sed 's/^/  /')" ) | \
+    yq "[.]"
   )
 
   echo "${PATCH_FULL}"

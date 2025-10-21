@@ -17,7 +17,7 @@
 # Download helm chart dependencies
 helm dependency update installers/helm/osm
 
-PKG_DIRECTORIES="common jenkins installers tools docker"
+PKG_DIRECTORIES="library jenkins installers tools docker"
 MDG_NAME=devops
 DEB_INSTALL=debian/osm-$MDG_NAME.install
 export DEBEMAIL="OSM_TECH@LIST.ETSI.ORG"

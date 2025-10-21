@@ -1,0 +1,270 @@
+#######################################################################################
+# Copyright ETSI Contributors and Others.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#######################################################################################
+
+apiVersion: osm.softwaredefinition.io/v1alpha1
+# kind: AppBlueprint
+kind: AppInstantiation
+metadata:
+  name: example2-app
+spec:
+  # description: "Example App Blueprint"
+  description: "Example App Instantiation"
+  version: "1.0.0"
+  ksus:
+  - name: main
+    target:
+      # Absolute path to KSU folder: repo-path + base-path + relative-path
+      repo-path:
+      - ${FLEET_REPOS_BASE}     # Default: `/repos`
+      - fleet             # Repo name.
+      base-path:
+      - ${PROJECT_NAME}   # Project name.
+      - ${PROFILE_TYPE}
+      - ${PROFILE_NAME}
+      relative-path:      # App folder + ksu folder (in case of multiple KSUs)
+      - ${APPNAME}
+      - main
+    patterns:
+    - name: active-pattern
+      source:
+        # Absolute path to OKA folder: repo-path + base-path + relative-path
+        repo-path:
+        - ${CATALOG_REPOS_BASE}     # Default: `/repos`
+        - sw-catalogs       # Repo name
+        base-path:          # Absolute path to OKA folder
+        - apps              # OKA type
+        - example2          # OKA folder
+        relative-path:      # Pattern template folder (default: `templates/`)
+        - templates
+        - main-pattern
+      # Pattern-specific parameters, to be added as needed (optional)
+      parameters:
+        EXAMPLE_PARAMETER1: active-example-value1
+        EXAMPLE_PARAMETER2: active-example-value2
+      bricks:
+      - name: main-brick
+        type: basic
+        # type: HelmReleaseSet
+        kustomization:
+          name: ks-${APPNAME}-${PATTERN_NAME}
+          # OPTIONAL:
+          # namespace: flux-system
+        source:             # Absolute path to manifests referenced by the Kustomization (brick folder): base-path + relative-path
+          repo-path:
+          - ${CATALOG_REPOS_BASE}     # Default: `/repos`
+          - sw-catalogs       # Repo name
+          base-path:          # Absolute path to OKA folder
+          - apps              # OKA type
+          - example2          # OKA folder
+          relative-path:
+          - manifests
+          - main-pattern
+          - main-brick-manifests
+      - name: database-brick
+        type: HelmReleaseSet
+        kustomization:
+          name: database-kustomization-${APPNAME}-${PATTERN_NAME}
+          # OPTIONAL:
+          # namespace: flux-system
+        source:
+          repo-path:
+          - ${CATALOG_REPOS_BASE}     # Default: `/repos`
+          - sw-catalogs       # Repo name
+          base-path:          # Absolute path to OKA folder
+          - apps              # OKA type
+          - example2          # OKA folder
+          relative-path:
+          - manifests
+          - main-pattern
+          - database-manifests
+        # To be inserted
+        public-age-key: age18juyaw9kvzgkpqx8kun2n7qtvqva6ajj7ulse435thkgnlfjhf2qj76h64
+        hrset-values:
+          - name: db-operator
+            HelmRelease:
+              name: postgres-operator-${APPNAME}-${PATTERN_NAME}
+              namespace: ${APPNAMESPACE}
+            inline-values:
+              key1: value1
+              key2: value2
+            valuesFrom:
+              configMapKeyRef:
+                name: postgres-operator-cm-${APPNAME}-${PATTERN_NAME}
+                # OPTIONAL:
+                # key: values.yaml
+              secretKeyRef:
+                name: postgres-operator-secret-${APPNAME}-${PATTERN_NAME}
+                # OPTIONAL:
+                # key: values.yaml
+            create-cm:      # If the map is empty, the ConfigMap will not be created
+              cm-key1: cm-value1
+              cm-key2: cm-value2
+            create-secret:  # If the map is empty, the Secret will not be created
+              env-values-reference: secret-values-for-postgres-operator-${APPNAME}
+          - name: db-op-user-interface
+            HelmRelease:
+              name: postgres-operator-ui-${APPNAME}-${PATTERN_NAME}
+              namespace: ${APPNAMESPACE}
+            inline-values:
+              key1: value1
+              key2: value2
+            valuesFrom:
+              configMapKeyRef:
+                name: postgres-operator-ui-cm-${APPNAME}-${PATTERN_NAME}
+                # OPTIONAL:
+                # key: values.yaml
+              secretKeyRef:
+                name: postgres-operator-ui-secret-${APPNAME}-${PATTERN_NAME}
+                # OPTIONAL:
+                # key: values.yaml
+            create-cm:      # If the map is empty, the ConfigMap will not be created
+              cm-key1: cm-value1
+              cm-key2: cm-value2
+            create-secret:  # If the map is empty, the Secret will not be created
+              env-values-reference: secret-values-for-postgres-operator-ui-${APPNAME}
+    - name: standby-pattern
+      source:
+        # Absolute path to OKA folder: repo-path + base-path + relative-path
+        repo-path:
+        - ${CATALOG_REPOS_BASE}     # Default: `/repos`
+        - sw-catalogs       # Repo name
+        base-path:          # Absolute path to OKA folder
+        - apps              # OKA type
+        - example2          # OKA folder
+        relative-path:      # Pattern template folder (default: `templates/`)
+        - templates
+        - main-pattern
+      # Pattern-specific parameters, to be added as needed (optional)
+      parameters:
+        EXAMPLE_PARAMETER1: standby-example-value1
+        EXAMPLE_PARAMETER2: standby-example-value2
+      bricks:
+      - name: main-brick
+        type: basic
+        # type: HelmReleaseSet
+        kustomization:
+          name: ks-${APPNAME}-${PATTERN_NAME}
+          # OPTIONAL:
+          # namespace: flux-system
+        source:             # Absolute path to manifests referenced by the Kustomization (brick folder): base-path + relative-path
+          repo-path:
+          - ${CATALOG_REPOS_BASE}     # Default: `/repos`
+          - sw-catalogs       # Repo name
+          base-path:          # Absolute path to OKA folder
+          - apps              # OKA type
+          - example2          # OKA folder
+          relative-path:
+          - manifests
+          - main-pattern
+          - main-brick-manifests
+      - name: database-brick
+        type: HelmReleaseSet
+        kustomization:
+          name: database-kustomization-${APPNAME}-${PATTERN_NAME}
+          # OPTIONAL:
+          # namespace: flux-system
+        source:
+          repo-path:
+          - ${CATALOG_REPOS_BASE}     # Default: `/repos`
+          - sw-catalogs       # Repo name
+          base-path:          # Absolute path to OKA folder
+          - apps              # OKA type
+          - example2          # OKA folder
+          relative-path:
+          - manifests
+          - main-pattern
+          - database-manifests
+        public-age-key: age18juyaw9kvzgkpqx8kun2n7qtvqva6ajj7ulse435thkgnlfjhf2qj76h64
+        hrset-values:
+          - name: db-operator
+            HelmRelease:
+              name: postgres-operator-${APPNAME}-${PATTERN_NAME}
+              namespace: ${APPNAMESPACE}
+            inline-values:
+              key1: value1
+              key2: value2
+            valuesFrom:
+              configMapKeyRef:
+                name: postgres-operator-cm-${APPNAME}-${PATTERN_NAME}
+                # OPTIONAL:
+                # key: values.yaml
+              secretKeyRef:
+                name: postgres-operator-secret-${APPNAME}-${PATTERN_NAME}
+                # OPTIONAL:
+                # key: values.yaml
+            create-cm:      # If the map is empty, the ConfigMap will not be created
+              cm-key1: cm-value1
+              cm-key2: cm-value2
+            create-secret:  # If the map is empty, the Secret will not be created
+              env-values-reference: secret-values-for-postgres-operator-${APPNAME}
+          - name: db-op-user-interface
+            HelmRelease:
+              name: postgres-operator-ui-${APPNAME}-${PATTERN_NAME}
+              namespace: ${APPNAMESPACE}
+            inline-values:
+              key1: value1
+              key2: value2
+            valuesFrom:
+              configMapKeyRef:
+                name: postgres-operator-ui-cm-${APPNAME}-${PATTERN_NAME}
+                # OPTIONAL:
+                # key: values.yaml
+              secretKeyRef:
+                name: postgres-operator-ui-secret-${APPNAME}-${PATTERN_NAME}
+                # OPTIONAL:
+                # key: values.yaml
+            create-cm:      # If the map is empty, the ConfigMap will not be created
+              cm-key1: cm-value1
+              cm-key2: cm-value2
+            create-secret:  # If the map is empty, the Secret will not be created
+              env-values-reference: secret-values-for-postgres-operator-ui-${APPNAME}
+  # parameters:
+  #   - name: replicaCount
+  #     description: "Number of replicas"
+  #     # default: 1
+  #     value: 1
+  #   - name: ingressHost
+  #     description: "Ingress hostname"
+  #     value: "ingress for-${APPNAME}"
+  # readinessChecks:
+  #   - resource:
+  #       kind: Deployment
+  #       name: main-deployment-${APPNAME}
+  #     condition:
+  #       type: Available
+  #       status: "True"
+  #   - resource:
+  #       kind: Service
+  #       name: main-service
+  #     condition:
+  #       type: Ready
+  # TODO:
+  # outputValues:
+  #   - name: apiEndpoint
+  #     valueFrom:
+  #       serviceIP:
+  #         name: main-service
+  #   - name: adminPassword
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: app-secrets
+  #         key: admin-password
+  # TODO:
+  # dependencies:
+  #   - name: nginx-ingress
+  #     type: InfraController
+  #     version: ">=1.0.0"

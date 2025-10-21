@@ -1,4 +1,3 @@
-{{- if not .Values.global.oldServiceAssurance -}}
 {{- if .Values.alertmanager.enabled -}}
 #######################################################################################
 # Copyright ETSI Contributors and Others.
@@ -23,7 +22,7 @@ metadata:
   labels:
     {{- include "osm.labels" . | nindent 4 }}
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ .Values.global.ingressClassName | default "nginx" }}
   rules:
 {{- if .Values.alertmanager.ingress.host }}
   - host: {{ .Values.alertmanager.ingress.host }}
@@ -39,5 +38,4 @@ spec:
             name: alertmanager
             port:
               number: 9093
-{{- end }}
 {{- end }}

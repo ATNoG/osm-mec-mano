@@ -14,17 +14,30 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
-
 apache=0
 nolicense=0
 other=0
+binaries=0
+deleted=0
 exception_list="':(exclude)*.pdf' ':(exclude)*.png' ':(exclude)*.jpeg' ':(exclude)*.jpg' ':(exclude)*.gif' ':(exclude)*.json' ':(exclude)*.ico' ':(exclude)*.svg' ':(exclude)*.tiff'"
 git fetch
 
-for file in $(echo ${exception_list} | xargs git diff --name-only origin/$GERRIT_BRANCH -- . ); do
+if [ -n "${GERRIT_BRANCH}" ]; then
+    COMMIT_TO_COMPARE="origin/${GERRIT_BRANCH}"
+else
+    COMMIT_TO_COMPARE="HEAD^"
+fi
 
-    file_type=$(file -b --mime-type $file | sed 's|/.*||')
-    echo $file is $file_type
+total_changes=$(git diff --name-only ${COMMIT_TO_COMPARE} -- . $(echo ${exception_list}) | wc -l)
+for file in $(git diff --name-only ${COMMIT_TO_COMPARE} -- . $(echo ${exception_list})); do
+    # Skip deleted files
+    if [ ! -f "$file" ]; then
+        deleted=$((deleted + 1))
+        continue
+    fi
+
+    file_type=$(file -b --mime-type "$file" | sed 's|/.*||')
+    echo "$file is $file_type"
     case "$file_type" in
         text)
             binary=false
@@ -38,14 +51,10 @@ for file in $(echo ${exception_list} | xargs git diff --name-only origin/$GERRIT
         license=Binary
     else
         license="No Apache license found"
-        if [ -f $file ]; then
-            if [ -s $file ]; then
-                if [ $(grep -c "http://www.apache.org/licenses/LICENSE-2.0" $file) -ge 1 ] ; then
-                    license="Apache-2.0"
-                fi
+        if [ -s "$file" ]; then
+            if grep -q "http://www.apache.org/licenses/LICENSE-2.0" "$file"; then
+                license="Apache-2.0"
             fi
-        else
-            license="DELETED"
         fi
     fi
     echo "$file $license"
@@ -56,9 +65,8 @@ for file in $(echo ${exception_list} | xargs git diff --name-only origin/$GERRIT
         No*)
             nolicense=$((nolicense + 1))
             ;;
-        "DELETED")
-            ;;
         "Binary")
+            binaries=$((binaries + 1))
             ;;
         *)
             echo "BAD LICENSE ON FILE $file"
@@ -67,6 +75,12 @@ for file in $(echo ${exception_list} | xargs git diff --name-only origin/$GERRIT
     esac
 done
 
+echo "Changes in license in this commit: ${total_changes}"
+echo "  Deleted files: ${deleted}"
+echo "  Binaries: ${binaries}"
+echo "  Apache license: ${apache}"
+echo "  No license: ${nolicense}"
+echo "  Other license: ${other}"
 
 if [ $nolicense -gt 0 ]; then
     echo "FATAL: Files without apache license found"

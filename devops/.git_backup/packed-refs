@@ -1,14 +1,16 @@
 # pack-refs with: peeled fully-peeled sorted 
 4010cd3a11e12a1fbda4335d3293c2e0742ec583 refs/remotes/origin/WIM
-aa124bdd235acefd7cc4b6e9efada3efd4cc8f1b refs/remotes/origin/bug1511
+9a51086452eaf7ee39c485246c7bcc4a4481efae refs/remotes/origin/bug1511
 0e5f5fe18d9d821ab018e4cb5708f567912af568 refs/remotes/origin/feature5837
 59c9465cac22604312947eebde176fe784b8679d refs/remotes/origin/feature7106
 0e5f5fe18d9d821ab018e4cb5708f567912af568 refs/remotes/origin/feature7928
-9ff7d648a250c54d46d78b63d9400ff2554e2f27 refs/remotes/origin/master
+3f00666b1d3eb4d67ac0eacb8e8999bb689aaeb9 refs/remotes/origin/fix-osm-gitea-installation-due-to-missing-memcached-tag
+8bc683f33c5b390bcc8068ffb7f2ab53013540d5 refs/remotes/origin/master
 227e9dfcb2afbda837cfd9cb94ba97daed03ecad refs/remotes/origin/multi_stack
 763d332c9fc6eec094d091ab66772c8563754476 refs/remotes/origin/netslice
 009a5d691dba1ec6aa8567bc27eb4d468e5e0db4 refs/remotes/origin/new-pipeline
 9a51086452eaf7ee39c485246c7bcc4a4481efae refs/remotes/origin/ng-ro-refactor
+37b346b36e0eb1d91fa58382b7017b3d52f6c2ad refs/remotes/origin/open-ebs-fix
 35cfd81f73e286a1ba4edca17a2b516ea44b5adb refs/remotes/origin/paas
 0e5f5fe18d9d821ab018e4cb5708f567912af568 refs/remotes/origin/py3
 829106f110462b78f4219c96ffbb7d79d48c1d10 refs/remotes/origin/rift300
@@ -21,8 +23,9 @@ dc4169284beb616ff53eee78d05efdda4ba48d96 refs/remotes/origin/v12.0
 df75b7aed0e184455b9de743f82003a1a2513956 refs/remotes/origin/v13.0
 8148f8550b3796b5bcb2a0c72905139ed3ce38a1 refs/remotes/origin/v14.0
 6272e40f60bb1c8f4d318f48ac9aef7f2ea22497 refs/remotes/origin/v15.0
-6c7fa27002719b34053469d143ebe896e70930ce refs/remotes/origin/v16.0
-b1dbb6d6f280a26d5d3dfb3375c3b963e00861db refs/remotes/origin/v17.0
+4f41c7fb668355fedf3fd6bb12bf97f9061ca614 refs/remotes/origin/v16.0
+ea60a58ec1ebfcbf7fd2a20c5c34353b5e897a35 refs/remotes/origin/v17.0
+c41921a689556987479d534c51d020cdab82812b refs/remotes/origin/v18.0
 c98140fa970061967d471fb3e506499f629492ac refs/remotes/origin/v2.0
 6dbf1e40c35dc8f1d78a3abdc0cd776e29d5fb9d refs/remotes/origin/v3.1
 f6ceb0911a1315a5027a7768ded6b2817324f12f refs/remotes/origin/v4.0
@@ -42,6 +45,8 @@ f43ce3c90a031a2a7cdd0c807a0eea80a1177a18 refs/tags/branch-ng-ro-refactor-start
 ^9a51086452eaf7ee39c485246c7bcc4a4481efae
 8793a2f25b23584669d1d3204ac85d0e564269d1 refs/tags/branch-sol006v331-start
 ^9a51086452eaf7ee39c485246c7bcc4a4481efae
+df494a7409e04be40d5c200720d40c00b9ebe70b refs/tags/release-paas-start
+^230f564de508f1820e40d0bab100763954255595
 cddae4de3f04046a56c5546756f37a0b17f1dba6 refs/tags/release-v10.0-start
 ^ded44484c3afad1bd55dd95d7acfccdd0a91c030
 48a87cd586f1730c9ddb48cc871b3bd85dd27783 refs/tags/release-v11.0-start
@@ -60,6 +65,8 @@ a82499d3aca4ffa513f9c949a7237ba16a2c34ca refs/tags/release-v8.0-start
 ^7334f68a8186a8a0e78f72422bba3fda42e0152b
 d17ae6a6ef0b6682b8e7ba7cd3dac9a1861b807b refs/tags/release-v9.0-start
 ^e7edc1dcab85a64b25dfa23b3d2aa9ce30423853
+22ce7eeff10e5fbb2c8f1bae72bdba44cc09eb6e refs/tags/test-gitjob
+^427cdb2645becdb6cf05c74e1562881e869c2e34
 2507f4a756479b620bc716e34e6cc85938e8b72a refs/tags/v1.0.0
 ^837fc9695b113d68db238183cbc6e9ec518d8d4e
 82e67046b02dd690a76027c5ad1e7516c20422ff refs/tags/v1.0.1
@@ -106,6 +113,8 @@ b6d4b96319a496f0d1b61bf736aa1b65345e258f refs/tags/v10.1.1rc2
 ^6eb54791a9e26a613bb75e3d624481da8e47fb62
 f499507912762800ae412d8357dac4c12f3088d7 refs/tags/v10.1.5
 ^6eb54791a9e26a613bb75e3d624481da8e47fb62
+786088cf4752b2d044c6e700d1fdf359fb495307 refs/tags/v10.1.6
+^f92f3137aeecbc88d221f44b7e992af1f5e116aa
 16c346ead804b119b266e8a3f26031e64c0f3955 refs/tags/v11.0.0
 ^c42ef651dda9464d9a02f669ee46db65ad9976a0
 812c55426fb1a91474501a049b7efaa88f9fcbbc refs/tags/v11.0.0rc1
@@ -172,6 +181,10 @@ e4f594ed8bf6ddb7d5d0b313f42716616ce8069f refs/tags/v17.0.0
 ^a9cab1f1a99ead4d006443f27c9644e226517ce9
 80f36a99ac0b827ad2bd0c69b3760e8ea47e059e refs/tags/v17.0.1
 ^ef72f874e64fe6681597c7ab9511041e74ff9fc3
+a36d5a7d69ca70d031153104fe0e2db9a1b5eccd refs/tags/v18.0.0
+^170735bc90f11efb2299dcaece024316c208a9c0
+fe500f53bd761d968877b7bac624f25ed1e9cbd9 refs/tags/v18.0.1
+^d3cb8b87ec1c7485a8d6c451ea1286fb9c2e534c
 6b2e3a6098a406b0e4836c7c6da23e6e5fe5e317 refs/tags/v2.0.0
 ^6ec7a922e94caf22575ecd0b9e1b1ff192e18aa5
 f8976a15da8fb61852067ab6b4cffbb3bd8cde0b refs/tags/v2.0.1

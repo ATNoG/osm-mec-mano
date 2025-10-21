@@ -38,7 +38,7 @@ This folder provides all required scripts and instructions for the full provisio
 First, you should load the environment variables with the key folders and configuration parameters. By default, in case some of them where still undefined, you may load sensible defaults by doing:
 
 ```bash
-source 00-base-config.rc
+source 20-base-config.rc
 ```
 
 Then, you should select the appropriate `kubeconfig` to point to the cluster where you want to install the auxiliary services. For instance:
@@ -64,7 +64,7 @@ First retrieve service's credentials and endpoints as environment variables:
 
 ```bash
 # Load Gitea environment
-source "${CREDENTIALS_DIR}/gitea_environment.rc"
+source "${CREDENTIALS_DIR}/git_environment.rc"
 source "${CREDENTIALS_DIR}/gitea_tokens.rc"
 
 # Load Minio environment
@@ -238,7 +238,7 @@ Load the environment:
 
 ```bash
 source 00-base-config.rc
-source "${CREDENTIALS_DIR}/gitea_environment.rc"
+source "${CREDENTIALS_DIR}/git_environment.rc"
 source "${CREDENTIALS_DIR}/gitea_tokens.rc"
 ```
 

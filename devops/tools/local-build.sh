@@ -191,7 +191,7 @@ function run_httpserver() {
 
 function stage_2() {
     print_section "Performing Stage 2"
-    MODULES="common devops IM LCM MON N2VC NBI NG-UI NG-SA osmclient PLA POL RO tests"
+    MODULES="common devops IM LCM MON N2VC NBI NG-UI NG-SA osmclient RO tests"
     if [ ! -z ${1} ] ; then
         POSSIBLE_MODULES=$(echo ${1} | sed "s/,/ /g")
         for MODULE in ${POSSIBLE_MODULES}; do

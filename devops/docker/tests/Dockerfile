@@ -80,6 +80,14 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get --yes update && \
 # Azure CLI
 RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash
 
+# Add vCluster CLI
+ENV VCLUSTER_VERSION "v0.26.0"
+RUN curl -L -o /tmp/vcluster "https://github.com/loft-sh/vcluster/releases/download/${VCLUSTER_VERSION}/vcluster-linux-amd64" \
+    && install -c -m 0755 /tmp/vcluster /usr/local/bin \
+    && rm -f /tmp/vcluster
+# Copy vCluster configuration
+COPY configs/vcluster.yaml /etc/vcluster.yaml
+
 RUN mv /usr/share/osm-tests/robot-systest /robot-systest
 RUN mv /usr/share/osm-tests/cloud-scripts /robot-systest/
 RUN mv /usr/share/osm-tests/conformance-tests/ /robot-systest/
@@ -107,6 +115,9 @@ ENV ROBOT_REPORT_FOLDER=/robot-systest/results
 
 # Kubeconfig file
 ENV K8S_CREDENTIALS=/root/.kube/config
+
+# Kubeconfig file of the existing cluster for Gitops tests
+ENV CLUSTER_KUBECONFIG_CREDENTIALS=/robot-systest/cluster-kubeconfig.yaml
 
 # OSM RSA file
 ENV OSM_RSA_FILE=/root/osm_id_rsa

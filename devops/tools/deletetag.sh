@@ -25,7 +25,7 @@ TAG="$2"
 tag_header="OSM Release TWO:"
 tag_message="$tag_header version $TAG"
 
-modules="common devops IM LCM MON N2VC NBI NG-UI NG-SA osmclient RO PLA POL SOL003 SOL005 tests"
+modules="common devops IM LCM MON N2VC NBI NG-UI NG-SA osmclient RO SOL003 SOL005 tests"
 list=""
 for i in $modules; do
     if [ "$1" == "$i" -o "$1" == "all" ]; then

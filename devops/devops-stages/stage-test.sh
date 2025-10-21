@@ -16,31 +16,6 @@
 
 set -eu
 
-CURRENT_DIR=`pwd`
-
-# Execute tests for charms
-CHARM_PATH="./installers/charm"
-NEW_CHARMS_NAMES="osm-keystone osm-lcm osm-mon osm-nbi osm-ng-ui osm-pol osm-ro vca-integrator-operator"
-OLD_CHARMS_NAMES="prometheus grafana"
-LOCAL_GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-GERRIT_BRANCH=${GERRIT_BRANCH:-${LOCAL_GIT_BRANCH}}
-for charm in $NEW_CHARMS_NAMES; do
-    if [ $(git diff --name-only "origin/${GERRIT_BRANCH}" -- "installers/charm/${charm}" | wc -l) -ne 0 ]; then
-        echo "Running tox for ${charm}"
-        cd "${CHARM_PATH}/${charm}"
-        TOX_PARALLEL_NO_SPINNER=1 tox -e lint,unit --parallel=auto
-        cd "${CURRENT_DIR}"
-    fi
-done
-for charm in $OLD_CHARMS_NAMES; do
-    if [ $(git diff --name-only "origin/${GERRIT_BRANCH}" -- "installers/charm/${charm}" | wc -l) -ne 0 ]; then
-        echo "Running tox for ${charm}"
-        cd "${CHARM_PATH}/${charm}"
-        TOX_PARALLEL_NO_SPINNER=1 tox --parallel=auto
-        cd "${CURRENT_DIR}"
-    fi
-done
-
 # Download helm chart dependencies
 helm dependency update installers/helm/osm
 

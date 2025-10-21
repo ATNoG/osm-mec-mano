@@ -38,6 +38,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get --yes update && \
 RUN DEBIAN_FRONTEND=noninteractive apt-get --yes update && \
     DEBIAN_FRONTEND=noninteractive apt-get --yes install \
     genisoimage=9:1.1.* \
+    libmagic1 \
     netbase=6.*
 
 ARG PYTHON3_OSM_COMMON_URL
@@ -57,6 +58,7 @@ ARG PYTHON3_OSM_ROVIM_AZURE_URL
 ARG PYTHON3_OSM_ROVIM_GCP_URL
 ARG PYTHON3_OSM_ROVIM_OPENSTACK_URL
 ARG PYTHON3_OSM_ROVIM_OPENVIM_URL
+ARG PYTHON3_OSM_ROVIM_VCENTER_URL
 ARG PYTHON3_OSM_ROVIM_VMWARE_URL
 
 RUN for URL in \
@@ -77,6 +79,7 @@ RUN for URL in \
     $PYTHON3_OSM_ROVIM_GCP_URL \
     $PYTHON3_OSM_ROVIM_OPENSTACK_URL \
     $PYTHON3_OSM_ROVIM_OPENVIM_URL \
+    $PYTHON3_OSM_ROVIM_VCENTER_URL \
     $PYTHON3_OSM_ROVIM_VMWARE_URL ; do \
         curl -s $URL -O ; \
     done
@@ -112,6 +115,11 @@ RUN rm -f /etc/apt/apt.conf.d/proxy.conf
 
 COPY --from=INSTALL /usr/bin/genisoimage /usr/bin/genisoimage
 COPY --from=INSTALL /etc/protocols /etc/protocols
+
+# Copy libmagic.so.1 and dependencies
+COPY --from=INSTALL /usr/lib/x86_64-linux-gnu/libmagic.so.1 /usr/lib/x86_64-linux-gnu/
+COPY --from=INSTALL /usr/lib/x86_64-linux-gnu/libmagic.so.1.* /usr/lib/x86_64-linux-gnu/
+COPY --from=INSTALL /usr/share/misc/magic.mgc /usr/share/misc/magic.mgc
 
 EXPOSE 9090
 

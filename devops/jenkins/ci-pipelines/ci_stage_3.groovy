@@ -50,6 +50,9 @@ properties([
         string(defaultValue: '/home/jenkins/hive/port-mapping-etsi-vim.yaml',
                description: 'Port mapping file for SDN assist in ETSI VIM',
                name: 'ROBOT_PORT_MAPPING_VIM'),
+        string(defaultValue: '/home/jenkins/hive/etsi-vim-prometheus.json',
+               description: 'Prometheus configuration file in ETSI VIM',
+               name: 'PROMETHEUS_CONFIG_VIM'),
         string(defaultValue: '/home/jenkins/hive/kubeconfig.yaml', description: '', name: 'KUBECONFIG'),
         string(defaultValue: '/home/jenkins/hive/clouds.yaml', description: '', name: 'CLOUDS'),
         string(defaultValue: 'Default', description: '', name: 'INSTALLER'),
@@ -61,8 +64,366 @@ properties([
 ])
 
 ////////////////////////////////////////////////////////////////////////////////////////
-// Helper Functions
+// Helper Classes & Functions
 ////////////////////////////////////////////////////////////////////////////////////////
+/** Usage:
+ *   def dr = new DockerRunner(this)
+ *   stdout = dr.run(
+ *       image   : "opensourcemano/tests:${tag}",
+ *       entry   : "/usr/bin/osm",        // optional
+ *       envVars : [ "OSM_HOSTNAME=${host}" ],
+ *       envFile : myEnv,
+ *       mounts  : [
+ *                  "${clouds}:/etc/openstack/clouds.yaml",
+ *                  "${kubeconfig}:/root/.kube/config"
+ *                ],
+ *       cmd     : "vim-create --name osm …"
+ *   )
+ */
+class DockerRunner implements Serializable {
+    def steps                       // Jenkins DSL context (`this` from the script)
+    DockerRunner(def steps) { this.steps = steps }
+
+    /** Returns stdout (trimmed) if returnStdout is true; throws Exception on non-zero exit */
+    String run(Map args = [:]) {
+        def returnStdout = args.remove('returnStdout') ?: false
+        def envFile  = args.envFile ?: ''
+        def entry    = args.entry   ? "--entrypoint ${args.entry}" : ''
+        def mounts   = (args.mounts ?: [])
+                        .findAll { it && it.trim() }  // Filter out null/empty values
+                        .collect { "-v ${it}" }.join(' ')
+        def envs      = (args.envVars ?: [])
+                        .findAll { it && it.trim() }  // Filter out null/empty values
+                        .collect { "--env ${it}" }.join(' ')
+        def image    = args.image ?: ''
+        def cmd      = args.cmd   ?: ''
+        def fullCmd  = """docker run ${entry} ${envs} ${envFile ? "--env-file ${envFile}" : ''} ${mounts} ${image} ${cmd}"""
+
+        def result = null
+        try {
+            if (returnStdout) {
+                result = steps.sh(returnStdout: true, script: fullCmd).trim()
+            } else {
+                steps.sh(script: fullCmd)
+            }
+        } catch (Exception ex) {
+            throw new Exception("docker run failed → ${ex.message}")
+        } finally {
+            steps.echo("Command executed: ${fullCmd}")
+        }
+        return result
+    }
+}
+
+/* -------------------------------------------------------------------
+ *  create_vcluster  – spin up a vcluster in the target OSM cluster
+ * @params:
+ *  tagName - The OSM test docker image tag to use
+ *  kubeconfigPath - The path of the OSM kubernetes master configuration
+ *                   file
+ ** Usage:
+ *    create_vcluster(containerName, env.OSM_KUBECONFIG_PATH)
+ * ------------------------------------------------------------------- */
+void create_vcluster(String tagName, String kubeconfigPath) {
+    def dr     = new DockerRunner(this)
+    def mounts = ["${kubeconfigPath}:/root/.kube/config"]
+    def envs   = ["KUBECONFIG=/root/.kube/config"]
+    def image  = "opensourcemano/tests:${tagName}"
+
+    // 1) create vcluster namespace
+    dr.run(
+        image   : image,
+        entry   : "kubectl",
+        envVars : envs,
+        mounts  : mounts,
+        cmd     : "create namespace vcluster || true"
+    )
+    println("Namespace 'vcluster' ensured")
+
+    // 2) create vcluster
+    dr.run(
+        image   : image,
+        entry   : "vcluster",
+        envVars : envs,
+        mounts  : mounts,
+        cmd     : "create e2e -n vcluster --connect=false -f /etc/vcluster.yaml"
+    )
+    println("vcluster 'e2e' created")
+
+    // 3) poll until Status is Running
+    int maxWaitMinutes = 2
+    long deadline = System.currentTimeMillis() + (maxWaitMinutes * 60 * 1000)
+    boolean running = false
+    String lastOut = ''
+
+    while (System.currentTimeMillis() < deadline) {
+        try {
+            lastOut = dr.run(
+                returnStdout: true,
+                image   : image,
+                entry   : "/bin/sh",
+                envVars : envs,
+                mounts  : mounts,
+                cmd     : '''-c "vcluster list --output json | jq -r \'.[] | select(.Name==\\\"e2e\\\") | .Status\'"'''
+            ).trim()
+        } catch (Exception e) {
+            println("Polling command failed: ${e.message}. Will retry.")
+            lastOut = "Error: ${e.message}"
+        }
+
+        println("Polling for vcluster status. Current status: '${lastOut}'")
+
+        if (lastOut == 'Running') {
+            running = true
+            break // Exit the while loop
+        }
+
+        sleep 10 // Wait 10 seconds before the next poll
+    }
+
+    if (!running) {
+        println("vcluster status after timeout: ${lastOut}")
+        throw new Exception("vcluster 'e2e' did not reach 'Running' state within ${maxWaitMinutes} minutes.")
+    }
+
+    // 4) get vcluster kubeconfig
+    env.VCLUSTER_KUBECONFIG_PATH = "${WORKSPACE}/kubeconfig/vcluster_config"
+    dr.run(
+        image   : image,
+        entry   : "vcluster",
+        envVars : envs,
+        mounts  : mounts,
+        cmd     : "connect e2e -n vcluster --server e2e.vcluster.svc.cluster.local:443 --print > ${env.VCLUSTER_KUBECONFIG_PATH}"
+    )
+
+    println("vcluster 'e2e' is Running ✔")
+}
+
+void register_etsi_vim_account(
+    String tagName,
+    String osmHostname,
+    String envfile=null,
+    String portmappingfile=null,
+    String kubeconfig=null,
+    String clouds=null,
+    String prometheusconfigfile=null
+) {
+    String VIM_TARGET = "osm"
+    String VIM_MGMT_NET = "osm-ext"
+    String OS_PROJECT_NAME = "osm_jenkins"
+    String OS_AUTH_URL = "http://172.21.247.1:5000/v3"
+    String entrypointCmd = "/usr/bin/osm"
+    tempdir = sh(returnStdout: true, script: 'mktemp -d').trim()
+    String environmentFile = ''
+    if (envfile) {
+        environmentFile = envfile
+    } else {
+        sh(script: "touch ${tempdir}/env")
+        environmentFile = "${tempdir}/env"
+    }
+    int attempts = 3
+    def dr = new DockerRunner(this)
+    while (attempts >= 0) {
+        try {
+            println("Attempting to register VIM account (remaining attempts: ${attempts})")
+            withCredentials([usernamePassword(credentialsId: 'openstack-jenkins-credentials',
+                        passwordVariable: 'OS_PASSWORD', usernameVariable: 'OS_USERNAME')]) {
+                String entrypointArgs = """vim-create --name ${VIM_TARGET} --user ${OS_USERNAME} \
+                        --password ${OS_PASSWORD} --tenant ${OS_PROJECT_NAME} \
+                        --auth_url ${OS_AUTH_URL} --account_type openstack --description vim \
+                        --prometheus_config_file /root/etsi-vim-prometheus.json \
+                        --config '{management_network_name: ${VIM_MGMT_NET}, dataplane_physical_net: physnet2}' || true"""
+                String createOutput = dr.run(
+                    image   : "opensourcemano/tests:${tagName}",
+                    entry   : entrypointCmd,
+                    envVars : [ "OSM_HOSTNAME=${osmHostname}" ],
+                    envFile : environmentFile,
+                    mounts  : [
+                        "${clouds}:/etc/openstack/clouds.yaml",
+                        "${kubeconfig}:/root/.kube/config",
+                        "${portmappingfile}:/root/port-mapping.yaml",
+                        "${prometheusconfigfile}:/root/etsi-vim-prometheus.json"
+                    ],
+                    cmd     : entrypointArgs,
+                    returnStdout: true
+                )
+                println("VIM Creation Output: ${createOutput}")
+            }
+
+            // Check if the VIM is ENABLED
+            int statusChecks = 5
+            while (statusChecks > 0) {
+                sleep(10)  // Wait for 10 seconds before checking status
+                entrypointArgs = """vim-list --long | grep ${VIM_TARGET}"""
+                String vimList = dr.run(
+                    image   : "opensourcemano/tests:${tagName}",
+                    entry   : entrypointCmd,
+                    envVars : [ "OSM_HOSTNAME=${osmHostname}" ],
+                    envFile : environmentFile,
+                    mounts  : [
+                        "${clouds}:/etc/openstack/clouds.yaml",
+                        "${kubeconfig}:/root/.kube/config",
+                        "${portmappingfile}:/root/port-mapping.yaml",
+                        "${prometheusconfigfile}:/root/etsi-vim-prometheus.json"
+                    ],
+                    cmd     : entrypointArgs,
+                    returnStdout: true
+                )
+                println("VIM List output: ${vimList}")
+                if (vimList.contains("ENABLED")) {
+                    println("VIM successfully registered and is ENABLED.")
+                    return
+                }
+                statusChecks--
+            }
+
+            // If stuck, delete and retry
+            println("VIM stuck for more than 50 seconds, deleting and retrying...")
+            entrypointArgs = """vim-delete --force ${VIM_TARGET}"""
+            String deleteOutput = dr.run(
+                image   : "opensourcemano/tests:${tagName}",
+                entry   : entrypointCmd,
+                envVars : [ "OSM_HOSTNAME=${osmHostname}" ],
+                envFile : environmentFile,
+                mounts  : [
+                    "${clouds}:/etc/openstack/clouds.yaml",
+                    "${kubeconfig}:/root/.kube/config",
+                    "${portmappingfile}:/root/port-mapping.yaml",
+                    "${prometheusconfigfile}:/root/etsi-vim-prometheus.json"
+                ],
+                cmd     : entrypointArgs,
+                returnStdout: true
+            )
+            println("VIM Deletion Output: ${deleteOutput}")
+            sleep(5)
+        } catch (Exception e) {
+            println("Something happened during the execution of docker run: ${e.message}")
+        }
+        attempts--
+    }
+    // If all attempts fail, throw an error
+    println("VIM failed to enter ENABLED state after multiple attempts.")
+    throw new Exception("VIM registration failed after multiple retries.")
+}
+
+void register_etsi_k8s_cluster(
+    String tagName,
+    String osmHostname,
+    String envfile=null,
+    String portmappingfile=null,
+    String kubeconfig=null,
+    String clouds=null,
+    String prometheusconfigfile=null
+) {
+    String K8S_CLUSTER_TARGET = "osm"
+    String VIM_TARGET = "osm"
+    String VIM_MGMT_NET = "osm-ext"
+    String K8S_CREDENTIALS = "/root/.kube/config"
+    String entrypointCmd = "/usr/bin/osm"
+    tempdir = sh(returnStdout: true, script: 'mktemp -d').trim()
+    String environmentFile = ''
+    if (envfile) {
+        environmentFile = envfile
+    } else {
+        sh(script: "touch ${tempdir}/env")
+        environmentFile = "${tempdir}/env"
+    }
+    int attempts = 3
+    def dr = new DockerRunner(this)
+    while (attempts >= 0) {
+        try {
+            println("Attempting to register K8s cluster (remaining attempts: ${attempts})")
+            String entrypointArgs = """k8scluster-add ${K8S_CLUSTER_TARGET} --creds ${K8S_CREDENTIALS} --version "v1" \
+                        --description "Robot-cluster" --skip-jujubundle --vim ${VIM_TARGET} \
+                        --k8s-nets '{net1: ${VIM_MGMT_NET}}'"""
+            String createOutput = dr.run(
+                image   : "opensourcemano/tests:${tagName}",
+                entry   : entrypointCmd,
+                envVars : [ "OSM_HOSTNAME=${osmHostname}" ],
+                envFile : environmentFile,
+                mounts  : [
+                    "${clouds}:/etc/openstack/clouds.yaml",
+                    "${kubeconfig}:/root/.kube/config",
+                    "${portmappingfile}:/root/port-mapping.yaml",
+                    "${prometheusconfigfile}:/root/etsi-vim-prometheus.json"
+                ],
+                cmd     : entrypointArgs,
+                returnStdout: true
+            )
+            println("K8s Cluster Addition Output: ${createOutput}")
+
+            // Check if the K8s cluster is ENABLED
+            int statusChecks = 10
+            while (statusChecks > 0) {
+                sleep(10)  // Wait for 10 seconds before checking status
+                entrypointArgs = """k8scluster-list | grep ${K8S_CLUSTER_TARGET}"""
+                String clusterList = dr.run(
+                    image   : "opensourcemano/tests:${tagName}",
+                    entry   : entrypointCmd,
+                    envVars : [ "OSM_HOSTNAME=${osmHostname}" ],
+                    envFile : environmentFile,
+                    mounts  : [
+                        "${clouds}:/etc/openstack/clouds.yaml",
+                        "${kubeconfig}:/root/.kube/config",
+                        "${portmappingfile}:/root/port-mapping.yaml",
+                        "${prometheusconfigfile}:/root/etsi-vim-prometheus.json"
+                    ],
+                    cmd     : entrypointArgs,
+                    returnStdout: true
+                )
+                println("K8s Cluster List Output: ${clusterList}")
+                if (clusterList.contains("ENABLED")) {
+                    println("K8s cluster successfully registered and is ENABLED.")
+                    return
+                }
+                statusChecks--
+            }
+
+            // If stuck, delete and retry
+            println("K8s cluster stuck for more than 50 seconds, deleting and retrying...")
+            entrypointArgs = """k8scluster-show ${K8S_CLUSTER_TARGET}"""
+            String showOutput = dr.run(
+                image   : "opensourcemano/tests:${tagName}",
+                entry   : entrypointCmd,
+                envVars : [ "OSM_HOSTNAME=${osmHostname}" ],
+                envFile : environmentFile,
+                mounts  : [
+                    "${clouds}:/etc/openstack/clouds.yaml",
+                    "${kubeconfig}:/root/.kube/config",
+                    "${portmappingfile}:/root/port-mapping.yaml",
+                    "${prometheusconfigfile}:/root/etsi-vim-prometheus.json"
+                ],
+                cmd     : entrypointArgs,
+                returnStdout: true
+            )
+            println("K8s Cluster Show Output: ${showOutput}")
+            entrypointArgs = """k8scluster-delete ${K8S_CLUSTER_TARGET}"""
+            String deleteOutput = dr.run(
+                image   : "opensourcemano/tests:${tagName}",
+                entry   : entrypointCmd,
+                envVars : [ "OSM_HOSTNAME=${osmHostname}" ],
+                envFile : environmentFile,
+                mounts  : [
+                    "${clouds}:/etc/openstack/clouds.yaml",
+                    "${kubeconfig}:/root/.kube/config",
+                    "${portmappingfile}:/root/port-mapping.yaml",
+                    "${prometheusconfigfile}:/root/etsi-vim-prometheus.json"
+                ],
+                cmd     : entrypointArgs,
+                returnStdout: true
+            )
+            println("K8s Cluster Deletion Output: ${deleteOutput}")
+            sleep(5)
+        } catch (Exception e) {
+            println("Something happened during the execution of docker run: ${e.message}")
+        }
+        attempts--
+    }
+    // If all attempts fail, throw an error
+    println("K8s cluster failed to enter ENABLED state after multiple attempts.")
+    throw new Exception("K8s cluster registration failed after multiple retries.")
+}
+
 void run_robot_systest(String tagName,
                        String testName,
                        String osmHostname,
@@ -77,7 +438,9 @@ void run_robot_systest(String tagName,
                        String jujuPassword=null,
                        String osmRSAfile=null,
                        String passThreshold='0.0',
-                       String unstableThreshold='0.0') {
+                       String unstableThreshold='0.0',
+                       Map extraEnvVars=null,
+                       Map extraVolMounts=null) {
     tempdir = sh(returnStdout: true, script: 'mktemp -d').trim()
     String environmentFile = ''
     if (envfile) {
@@ -88,30 +451,55 @@ void run_robot_systest(String tagName,
     }
     PROMETHEUS_PORT_VAR = ''
     if (prometheusPort != null) {
-        PROMETHEUS_PORT_VAR = "--env PROMETHEUS_PORT=${prometheusPort}"
+        PROMETHEUS_PORT_VAR = "PROMETHEUS_PORT=${prometheusPort}"
     }
     hostfilemount = ''
     if (hostfile) {
-        hostfilemount = "-v ${hostfile}:/etc/hosts"
+        hostfilemount = "${hostfile}:/etc/hosts"
     }
 
     JUJU_PASSWORD_VAR = ''
     if (jujuPassword != null) {
-        JUJU_PASSWORD_VAR = "--env JUJU_PASSWORD=${jujuPassword}"
+        JUJU_PASSWORD_VAR = "JUJU_PASSWORD=${jujuPassword}"
     }
 
     try {
-        withCredentials([usernamePassword(credentialsId: 'gitlab-oci-test', 
+        withCredentials([usernamePassword(credentialsId: 'gitlab-oci-test',
                         passwordVariable: 'OCI_REGISTRY_PSW', usernameVariable: 'OCI_REGISTRY_USR')]) {
-            sh("""docker run --env OSM_HOSTNAME=${osmHostname} --env PROMETHEUS_HOSTNAME=${prometheusHostname} \
-               ${PROMETHEUS_PORT_VAR} ${JUJU_PASSWORD_VAR} --env-file ${environmentFile} \
-               --env OCI_REGISTRY_URL=${ociRegistryUrl} --env OCI_REGISTRY_USER=${OCI_REGISTRY_USR} \
-               --env OCI_REGISTRY_PASSWORD=${OCI_REGISTRY_PSW} \
-               -v ${clouds}:/etc/openstack/clouds.yaml -v ${osmRSAfile}:/root/osm_id_rsa \
-               -v ${kubeconfig}:/root/.kube/config -v ${tempdir}:/robot-systest/reports \
-               -v ${portmappingfile}:/root/port-mapping.yaml ${hostfilemount} opensourcemano/tests:${tagName} \
-               -c -t ${testName}""")
+
+            def baseEnvVars = [
+                "OSM_HOSTNAME=${osmHostname}",
+                "PROMETHEUS_HOSTNAME=${prometheusHostname}",
+                PROMETHEUS_PORT_VAR ? "${PROMETHEUS_PORT_VAR}" : null,
+                JUJU_PASSWORD_VAR ? "${JUJU_PASSWORD_VAR}" : null,
+                "OCI_REGISTRY_URL=${ociRegistryUrl}",
+                "OCI_REGISTRY_USER=${OCI_REGISTRY_USR}",
+                "OCI_REGISTRY_PASSWORD=${OCI_REGISTRY_PSW}"
+            ].findAll { it != null }
+            def baseMounts = [
+                "${clouds}:/etc/openstack/clouds.yaml",
+                "${osmRSAfile}:/root/osm_id_rsa",
+                "${kubeconfig}:/root/.kube/config",
+                "${tempdir}:/robot-systest/reports",
+                "${portmappingfile}:/root/port-mapping.yaml",
+                "${hostfilemount}"
+            ].findAll { it != null }
+
+            // Convert and merge extra parameters
+            def extraEnvVarsList = extraEnvVars?.collect { key, value -> "${key}=${value}" } ?: []
+            def extraVolMountsList = extraVolMounts?.collect { hostPath, containerPath -> "${hostPath}:${containerPath}" } ?: []
+
+            def dr = new DockerRunner(this)
+            dr.run(
+                image   : "opensourcemano/tests:${tagName}",
+                envVars : baseEnvVars + extraEnvVarsList,
+                envFile : "${environmentFile}",
+                mounts  : baseMounts + extraVolMountsList,
+                cmd     : "-t ${testName}"
+            )
         }
+    } catch (Exception e) {
+        println("Robotest execution failed with: ${e.message}")
     } finally {
         try {
             sh("cp ${tempdir}/*.xml .")
@@ -143,7 +531,41 @@ void run_robot_systest(String tagName,
 
 void archive_logs(Map remote) {
 
-    sshCommand remote: remote, command: '''mkdir -p logs/dags'''
+    sshCommand remote: remote, command: '''mkdir -p logs/dags logs/vcluster logs/flux-system logs/events logs/system'''
+    // Collect Kubernetes events
+    sshCommand remote: remote, command: '''
+        echo "Extracting Kubernetes events"
+        kubectl get events --all-namespaces --sort-by='.lastTimestamp' -o wide > logs/events/k8s-events.log 2>&1 || true
+        kubectl get events -n osm --sort-by='.lastTimestamp' -o wide > logs/events/osm-events.log 2>&1 || true
+        kubectl get events -n vcluster --sort-by='.lastTimestamp' -o wide > logs/events/vcluster-events.log 2>&1 || true
+        kubectl get events -n flux-system --sort-by='.lastTimestamp' -o wide > logs/events/flux-system-events.log 2>&1 || true
+    '''
+    // Collect host logs
+    sshCommand remote: remote, command: '''
+      echo "Collect system logs"
+      if command -v journalctl >/dev/null; then
+        journalctl > logs/system/system.log
+      fi
+
+      for entry in syslog messages; do
+        [ -e "/var/log/${entry}" ] && cp -f /var/log/${entry} logs/system/"${entry}.log"
+      done
+
+      echo "Collect active services"
+      case "$(cat /proc/1/comm)" in
+        systemd)
+          systemctl list-units > logs/system/services.txt 2>&1
+          ;;
+        *)
+          service --status-all >> logs/system/services.txt 2>&1
+          ;;
+      esac
+
+      top -b -n 1 > logs/system/top.txt 2>&1
+      ps fauxwww > logs/system/ps.txt 2>&1
+    '''
+
+
     if (useCharmedInstaller) {
         sshCommand remote: remote, command: '''
             for pod in `kubectl get pods -n osm | grep -v operator | grep -v NAME| awk '{print $1}'`; do
@@ -157,27 +579,45 @@ void archive_logs(Map remote) {
             for deployment in `kubectl -n osm get deployments | grep -v operator | grep -v NAME| awk '{print $1}'`; do
                 echo "Extracting log for $deployment"
                 kubectl -n osm logs deployments/$deployment --timestamps=true --all-containers 2>&1 \
-                > logs/$deployment.log
+                > logs/$deployment.log || true
             done
         '''
         sshCommand remote: remote, command: '''
             for statefulset in `kubectl -n osm get statefulsets | grep -v operator | grep -v NAME| awk '{print $1}'`; do
                 echo "Extracting log for $statefulset"
                 kubectl -n osm logs statefulsets/$statefulset --timestamps=true --all-containers 2>&1 \
-                > logs/$statefulset.log
+                > logs/$statefulset.log || true
             done
         '''
         sshCommand remote: remote, command: '''
-            schedulerPod="$(kubectl get pods -n osm | grep airflow-scheduler| awk '{print $1; exit}')"; \
+            schedulerPod="$(kubectl get pods -n osm | grep osm-scheduler| awk '{print $1; exit}')"; \
             echo "Extracting logs from Airflow DAGs from pod ${schedulerPod}"; \
-            kubectl cp -n osm ${schedulerPod}:/opt/airflow/logs/scheduler/latest/dags logs/dags -c scheduler
+            kubectl -n osm cp ${schedulerPod}:/opt/airflow/logs/scheduler/latest/dags logs/dags -c scheduler 2>&1 || true
+        '''
+        // Collect vcluster namespace logs
+        sshCommand remote: remote, command: '''
+            echo "Extracting logs from vcluster namespace"
+            for pod in `kubectl get pods -n vcluster | grep -v NAME | awk '{print $1}'`; do
+                echo "Extracting log for vcluster pod: $pod"
+                kubectl logs -n vcluster $pod --timestamps=true --all-containers 2>&1 \
+                > logs/vcluster/$pod.log || true
+            done
+        '''
+        // Collect flux-system namespace logs
+        sshCommand remote: remote, command: '''
+            echo "Extracting logs from flux-system namespace"
+            for pod in `kubectl get pods -n flux-system | grep -v NAME | awk '{print $1}'`; do
+                echo "Extracting log for flux-system pod: $pod"
+                kubectl logs -n flux-system $pod --timestamps=true --all-containers 2>&1 \
+                > logs/flux-system/$pod.log || true
+            done
         '''
     }
 
     sh 'rm -rf logs'
-    sshCommand remote: remote, command: '''ls -al logs'''
+    sshCommand remote: remote, command: '''ls -al logs logs/vcluster logs/events logs/flux-system logs/system'''
     sshGet remote: remote, from: 'logs', into: '.', override: true
-    archiveArtifacts artifacts: 'logs/*.log, logs/dags/*.log'
+    archiveArtifacts artifacts: 'logs/*.log, logs/dags/*.log, logs/vcluster/*.log, logs/events/*.log, logs/flux-system/*.log, logs/system/**'
 }
 
 String get_value(String key, String output) {
@@ -281,8 +721,8 @@ node("${params.NODE}") {
                     }
 
                     parallelSteps = [:]
-                    list = ['RO', 'osmclient', 'IM', 'devops', 'MON', 'N2VC', 'NBI',
-                            'common', 'LCM', 'POL', 'NG-UI', 'NG-SA', 'PLA', 'tests']
+                    list = ['RO', 'osmclient', 'IM', 'devops', 'MON', 'NBI',
+                            'common', 'LCM', 'NG-UI', 'NG-SA', 'tests']
                     if (upstreamComponent.length() > 0) {
                         println("Skipping upstream fetch of ${upstreamComponent}")
                         list.remove(upstreamComponent)
@@ -549,7 +989,7 @@ node("${params.NODE}") {
                     ]
 
                     sshCommand remote: remote, command: '''
-                        wget https://osm-download.etsi.org/ftp/osm-16.0-sixteen/install_osm.sh
+                        wget https://osm-download.etsi.org/ftp/osm-18.0-eighteen/install_osm.sh
                         chmod +x ./install_osm.sh
                         sed -i '1 i\\export PATH=/snap/bin:\$PATH' ~/.bashrc
                     '''
@@ -614,14 +1054,37 @@ node("${params.NODE}") {
                 stage('OSM Health') {
                     // if this point is reached, logs should be archived
                     ARCHIVE_LOGS_FLAG = true
-                    stackName = 'osm'
                     sshCommand remote: remote, command: """
-                        /usr/share/osm-devops/installers/osm_health.sh -k -s ${stackName}
+                        OSM_HOSTNAME=nbi.${remote.host}.nip.io ~/.local/bin/osm vim-list
                     """
                 } // stage("OSM Health")
+///////////////////////////////////////////////////////////////////////////////////////
+// Get OSM Kubeconfig and store it for future usage
+///////////////////////////////////////////////////////////////////////////////////////
+                stage('OSM Get kubeconfig') {
+                  // Delete always kubecofig directory to ensure it is clean.
+                  sh '''
+                    rm -rf "${WORKSPACE}/kubeconfig"
+                    mkdir -p "${WORKSPACE}/kubeconfig"
+                  '''
+                  env.OSM_KUBECONFIG_PATH = "${WORKSPACE}/kubeconfig/osm_config"
+                  sshGet  remote: remote,
+                          from:  "/home/ubuntu/.kube/config",
+                          into:  env.OSM_KUBECONFIG_PATH,
+                          override: true
+                  sh "cat ${env.OSM_KUBECONFIG_PATH}"
+                } // stage('OSM Get kubeconfig')
+
+///////////////////////////////////////////////////////////////////////////////////////
+// Create vCluster for GitOps test execution
+///////////////////////////////////////////////////////////////////////////////////////
+                stage('Create vCluster') {
+                  // create an isolated vcluster for the E2E tests
+                  create_vcluster(containerName, env.OSM_KUBECONFIG_PATH)
+                  // Verify vCluster kubeconfig is available
+                  sh "cat ${env.VCLUSTER_KUBECONFIG_PATH}"
+                } // stage('Create vCluster')
             } // if ( params.DO_INSTALL )
-
-
 ///////////////////////////////////////////////////////////////////////////////////////
 // Execute Robot tests
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -645,6 +1108,24 @@ EOF"""
                             echo `juju gui 2>&1 | grep password | cut -d: -f2`
                         '''
 
+                        register_etsi_vim_account(
+                            containerName,
+                            osmHostname,
+                            params.ROBOT_VIM,
+                            params.ROBOT_PORT_MAPPING_VIM,
+                            params.KUBECONFIG,
+                            params.CLOUDS,
+                            params.PROMETHEUS_CONFIG_VIM
+                        )
+                        register_etsi_k8s_cluster(
+                            containerName,
+                            osmHostname,
+                            params.ROBOT_VIM,
+                            params.ROBOT_PORT_MAPPING_VIM,
+                            params.KUBECONFIG,
+                            params.CLOUDS,
+                            params.PROMETHEUS_CONFIG_VIM
+                        )
                         run_robot_systest(
                             containerName,
                             params.ROBOT_TAG_NAME,
@@ -660,7 +1141,11 @@ EOF"""
                             jujuPassword,
                             SSH_KEY,
                             params.ROBOT_PASS_THRESHOLD,
-                            params.ROBOT_UNSTABLE_THRESHOLD
+                            params.ROBOT_UNSTABLE_THRESHOLD,
+                            // extraEnvVars map of extra environment variables
+                            ['CLUSTER_KUBECONFIG_CREDENTIALS': '/robot-systest/cluster-kubeconfig.yaml'],
+                            // extraVolMounts map of extra volume mounts
+                            [(env.VCLUSTER_KUBECONFIG_PATH): '/robot-systest/cluster-kubeconfig.yaml']
                         )
                     } // stage("System Integration Test")
                 } finally {

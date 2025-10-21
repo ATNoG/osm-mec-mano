@@ -4,7 +4,7 @@
 	bare = false
 	logallrefupdates = true
 [remote "origin"]
-	url = https://osm.etsi.org/gerrit/osm/devops
+	url = https://osm.etsi.org/gitlab/osm/devops.git
 	fetch = +refs/heads/*:refs/remotes/origin/*
 [branch "master"]
 	remote = origin

@@ -1,0 +1,41 @@
+#######################################################################################
+# Copyright ETSI Contributors and Others.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#######################################################################################
+
+# Location where credentials should be saved
+export CREDENTIALS_DIR=${CREDENTIALS_DIR:-../../../.credentials}; export CREDENTIALS_DIR=$(readlink -f "${CREDENTIALS_DIR}")
+
+# Minio version
+export MINIO_VERSION="${MINIO_VERSION:-v5.0.11}"
+
+# Minio tenant name
+export MINIO_TENANT_NAME=${MINIO_TENANT_NAME:-minio-osm-tenant}
+
+# Minio tenant capacity
+export MINIO_TENANT_CAPACITY=${MINIO_TENANT_CAPACITY:-10Gi}
+
+# Number of tenant servers
+export MINIO_TENANT_SERVERS=${MINIO_TENANT_SERVERS:-2}
+
+# Number of tenant volumes
+export MINIO_TENANT_VOLUMES=${MINIO_TENANT_VOLUMES:-4}
+
+# Expose with Ingress
+export MINIO_EXPOSE_CONSOLE=true
+export MINIO_EXPOSE_TENANT=true
+
+# Ingress classname
+export MINIO_INGRESS_CLASSNAME=${AUX_CLUSTER_INGRESS_CLASS:-nginx}

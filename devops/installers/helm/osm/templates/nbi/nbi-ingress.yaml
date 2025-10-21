@@ -24,7 +24,7 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ .Values.global.ingressClassName | default "nginx" }}
   rules:
 {{- if .Values.nbi.ingress.host }}
   - host: {{ .Values.nbi.ingress.host }}

@@ -1,0 +1,320 @@
+#######################################################################################
+# Copyright ETSI Contributors and Others.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#######################################################################################
+
+- apiVersion: config.kubernetes.io/v1
+  kind: ResourceList
+  items:
+  - apiVersion: kustomize.toolkit.fluxcd.io/v1
+    kind: Kustomization
+    metadata:
+      name: database-kustomization-myapp02-active-pattern
+      namespace: flux-system
+      annotations:
+        config.kubernetes.io/index: '0'
+        config.kubernetes.io/path: ks-database.yaml
+        internal.config.kubernetes.io/index: '0'
+        internal.config.kubernetes.io/path: ks-database.yaml
+        internal.config.kubernetes.io/seqindent: compact
+    spec:
+      interval: 1h0m0s
+      path: apps/example2/manifests/main-pattern/database-manifests
+      prune: true
+      sourceRef:
+        kind: GitRepository
+        name: sw-catalogs
+        namespace: flux-system
+      targetNamespace: app-namespace
+      postBuild:
+        substitute:
+          appname: myapp02
+          appnamespace: app-namespace
+      wait: true
+      patches:
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-myapp02-active-pattern
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/values
+            value:
+              key1: value1
+              key2: value2
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-myapp02-active-pattern
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/valuesFrom/-
+            value:
+              kind: ConfigMap
+              name: postgres-operator-cm-myapp02-active-pattern
+              key: values.yaml
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-myapp02-active-pattern
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/valuesFrom/-
+            value:
+              kind: Secret
+              name: postgres-operator-secret-myapp02-active-pattern
+              key: values.yaml
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-ui-myapp02-active-pattern
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/values
+            value:
+              key1: value1
+              key2: value2
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-ui-myapp02-active-pattern
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/valuesFrom/-
+            value:
+              kind: ConfigMap
+              name: postgres-operator-ui-cm-myapp02-active-pattern
+              key: values.yaml
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-ui-myapp02-active-pattern
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/valuesFrom/-
+            value:
+              kind: Secret
+              name: postgres-operator-ui-secret-myapp02-active-pattern
+              key: values.yaml
+  - apiVersion: kustomize.toolkit.fluxcd.io/v1
+    kind: Kustomization
+    metadata:
+      name: ks-myapp02-active-pattern
+      namespace: flux-system
+      annotations:
+        config.kubernetes.io/index: '0'
+        config.kubernetes.io/path: ks-main.yaml
+        internal.config.kubernetes.io/index: '0'
+        internal.config.kubernetes.io/path: ks-main.yaml
+        internal.config.kubernetes.io/seqindent: compact
+    spec:
+      interval: 1h0m0s
+      path: apps/example2/manifests/main-pattern/main-brick-manifests
+      prune: true
+      sourceRef:
+        kind: GitRepository
+        name: sw-catalogs
+        namespace: flux-system
+      targetNamespace: app-namespace
+      postBuild:
+        substitute:
+          app_name: myapp02
+          example_parameter1: active-example-value1
+          example_parameter2: active-example-value2
+      wait: true
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: postgres-operator-cm-myapp02-active-pattern
+      namespace: app-namespace
+      annotations:
+        config.kubernetes.io/path: postgres-operator-cm-myapp02-active-pattern.yaml
+        internal.config.kubernetes.io/path: postgres-operator-cm-myapp02-active-pattern.yaml
+    data:
+      values.yaml: |-
+        cm-key1: cm-value1
+        cm-key2: cm-value2
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: postgres-operator-secret-myapp02-active-pattern
+      namespace: app-namespace
+      annotations:
+        config.kubernetes.io/path: postgres-operator-secret-myapp02-active-pattern.yaml
+        internal.config.kubernetes.io/path: postgres-operator-secret-myapp02-active-pattern.yaml
+    data:
+      values.yaml: ENCRYPTED
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: postgres-operator-ui-cm-myapp02-active-pattern
+      namespace: app-namespace
+      annotations:
+        config.kubernetes.io/path: postgres-operator-ui-cm-myapp02-active-pattern.yaml
+        internal.config.kubernetes.io/path: postgres-operator-ui-cm-myapp02-active-pattern.yaml
+    data:
+      values.yaml: |-
+        cm-key1: cm-value1
+        cm-key2: cm-value2
+  - apiVersion: kustomize.toolkit.fluxcd.io/v1
+    kind: Kustomization
+    metadata:
+      name: database-kustomization-myapp02-standby-pattern
+      namespace: flux-system
+      annotations:
+        config.kubernetes.io/index: '0'
+        config.kubernetes.io/path: ks-database.yaml
+        internal.config.kubernetes.io/index: '0'
+        internal.config.kubernetes.io/path: ks-database.yaml
+        internal.config.kubernetes.io/seqindent: compact
+    spec:
+      interval: 1h0m0s
+      path: apps/example2/manifests/main-pattern/database-manifests
+      prune: true
+      sourceRef:
+        kind: GitRepository
+        name: sw-catalogs
+        namespace: flux-system
+      targetNamespace: app-namespace
+      postBuild:
+        substitute:
+          appname: myapp02
+          appnamespace: app-namespace
+      wait: true
+      patches:
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-myapp02-standby-pattern
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/values
+            value:
+              key1: value1
+              key2: value2
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-myapp02-standby-pattern
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/valuesFrom/-
+            value:
+              kind: ConfigMap
+              name: postgres-operator-cm-myapp02-standby-pattern
+              key: values.yaml
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-myapp02-standby-pattern
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/valuesFrom/-
+            value:
+              kind: Secret
+              name: postgres-operator-secret-myapp02-standby-pattern
+              key: values.yaml
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-ui-myapp02-standby-pattern
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/values
+            value:
+              key1: value1
+              key2: value2
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-ui-myapp02-standby-pattern
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/valuesFrom/-
+            value:
+              kind: ConfigMap
+              name: postgres-operator-ui-cm-myapp02-standby-pattern
+              key: values.yaml
+      - target:
+          kind: HelmRelease
+          name: postgres-operator-ui-myapp02-standby-pattern
+          namespace: app-namespace
+        patch: |
+          - op: add
+            path: /spec/valuesFrom/-
+            value:
+              kind: Secret
+              name: postgres-operator-ui-secret-myapp02-standby-pattern
+              key: values.yaml
+  - apiVersion: kustomize.toolkit.fluxcd.io/v1
+    kind: Kustomization
+    metadata:
+      name: ks-myapp02-standby-pattern
+      namespace: flux-system
+      annotations:
+        config.kubernetes.io/index: '0'
+        config.kubernetes.io/path: ks-main.yaml
+        internal.config.kubernetes.io/index: '0'
+        internal.config.kubernetes.io/path: ks-main.yaml
+        internal.config.kubernetes.io/seqindent: compact
+    spec:
+      interval: 1h0m0s
+      path: apps/example2/manifests/main-pattern/main-brick-manifests
+      prune: true
+      sourceRef:
+        kind: GitRepository
+        name: sw-catalogs
+        namespace: flux-system
+      targetNamespace: app-namespace
+      postBuild:
+        substitute:
+          app_name: myapp02
+          example_parameter1: standby-example-value1
+          example_parameter2: standby-example-value2
+      wait: true
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: postgres-operator-cm-myapp02-standby-pattern
+      namespace: app-namespace
+      annotations:
+        config.kubernetes.io/path: postgres-operator-cm-myapp02-standby-pattern.yaml
+        internal.config.kubernetes.io/path: postgres-operator-cm-myapp02-standby-pattern.yaml
+    data:
+      values.yaml: |-
+        cm-key1: cm-value1
+        cm-key2: cm-value2
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: postgres-operator-secret-myapp02-standby-pattern
+      namespace: app-namespace
+      annotations:
+        config.kubernetes.io/path: postgres-operator-secret-myapp02-standby-pattern.yaml
+        internal.config.kubernetes.io/path: postgres-operator-secret-myapp02-standby-pattern.yaml
+    data:
+      values.yaml: ENCRYPTED
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: postgres-operator-ui-cm-myapp02-standby-pattern
+      namespace: app-namespace
+      annotations:
+        config.kubernetes.io/path: postgres-operator-ui-cm-myapp02-standby-pattern.yaml
+        internal.config.kubernetes.io/path: postgres-operator-ui-cm-myapp02-standby-pattern.yaml
+    data:
+      values.yaml: |-
+        cm-key1: cm-value1
+        cm-key2: cm-value2

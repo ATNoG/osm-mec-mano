@@ -39,7 +39,7 @@ spec:
     - "client auth"
   issuerRef:
     name: ca-issuer
-    kind: ClusterIssuer
+    kind: Issuer
     group: cert-manager.io
 {{- end }}
 {{- end }}
