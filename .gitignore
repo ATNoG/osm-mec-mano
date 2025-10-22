@@ -1,3 +1,5 @@
+**/OSM-ETSI-Release-key.gpg
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

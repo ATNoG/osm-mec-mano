@@ -93,17 +93,17 @@ global:
 
 airflow:
   enabled: true
-  # postgresql:
-  #   image:
-  #     repository: bitnamilegacy/postgresql
+  postgresql:
+    image:
+      repository: bitnamilegacy/postgresql
           
-  #   volumePermissions:
-  #     image:
-  #       repository: bitnamilegacy/bitnami-shell
+    volumePermissions:
+      image:
+        repository: bitnamilegacy/bitnami-shell
 
-  #   metrics:
-  #     image:
-  #       repository: bitnamilegacy/mongodb-exporter
+    metrics:
+      image:
+        repository: bitnamilegacy/mongodb-exporter
   fullnameOverride: "airflow"
   config:
     core:
@@ -290,8 +290,8 @@ grafana:
 
 kafka:
   enabled: true
-  # image:
-  #   repository: bitnamilegacy/kafka
+  image:
+    repository: bitnamilegacy/kafka
   listeners:
     client:
       protocol: "PLAINTEXT"
@@ -310,20 +310,20 @@ kafka:
     enabled: true
     autoDiscovery:
       enabled: true
-      # image:
-      #   repository: bitnamilegacy/kubectl
+      image:
+        repository: bitnamilegacy/kubectl
     controller:
       service:
         type: NodePort
         nodePorts:
           - 31999
-  # volumePermissions:
-  #   image:
-  #     repository: bitnamilegacy/os-shell
-  # metrics:
-  #   jmx:
-  #     image:
-  #       repository: bitnamilegacy/jmx-exporter
+  volumePermissions:
+    image:
+      repository: bitnamilegacy/os-shell
+  metrics:
+    jmx:
+      image:
+        repository: bitnamilegacy/jmx-exporter
   serviceAccount:
     create: true
   rbac:
@@ -383,21 +383,21 @@ mon:
 
 mongodb:
   enabled: true
-  # image:
-  #   repository: bitnamilegacy/mongodb
-  # tls:
-  #   image:
-  #     repository: bitnamilegacy/nginx
-  # externalAccess:
-  #   autoDiscovery:
-  #     image:
-  #       repository: bitnamilegacy/kubectl
-  # volumePermissions:
-  #   image:
-  #     repository: bitnamilegacy/bitnami-shell
-  # metrics:
-  #   image:
-  #     repository: bitnamilegacy/mongodb-exporter
+  image:
+    repository: bitnamilegacy/mongodb
+  tls:
+    image:
+      repository: bitnamilegacy/nginx
+  externalAccess:
+    autoDiscovery:
+      image:
+        repository: bitnamilegacy/kubectl
+  volumePermissions:
+    image:
+      repository: bitnamilegacy/bitnami-shell
+  metrics:
+    image:
+      repository: bitnamilegacy/mongodb-exporter
   fullnameOverride: "mongodb-k8s"
   replicaCount: 1
   service:
@@ -421,14 +421,14 @@ mongodb:
 mysql:
   enabled: false
   image:
-    # repository: bitnamilegacy/mysql
+    repository: bitnamilegacy/mysql
     tag: "8.1-debian-11"
-  # volumePermissions:
-  #   image:
-  #     repository: bitnamilegacy/os-shell
-  # metrics:
-  #   image:
-  #     repository: bitnamilegacy/mysqld-exporter
+  volumePermissions:
+    image:
+      repository: bitnamilegacy/os-shell
+  metrics:
+    image:
+      repository: bitnamilegacy/mysqld-exporter
   fullnameOverride: "mysql"
 
 nbi:
