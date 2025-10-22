@@ -35,7 +35,7 @@ helm upgrade --install gitea gitea-charts/gitea \
     --namespace=gitea \
     --values "${HERE}/${GITEA_CHART_VALUES_FILE}" \
     --set=gitea.admin.username="${GITEA_ADMINISTRATOR_USERNAME}" \
-    --set=gitea.admin.password="${GITEA_ADMINISTRATOR_PASSWORD@Q}" \
+    --set=gitea.admin.password="${GITEA_ADMINISTRATOR_PASSWORD}" \
     --create-namespace \
     --wait
 
