@@ -127,7 +127,7 @@ echo "helm dependency update ${HERE}/helm/osm"
 helm dependency update ${HERE}/helm/osm
 # Deploy helm chart
 echo "helm upgrade --install -n $OSM_NAMESPACE --create-namespace $OSM_HELM_RELEASE ${HERE}/helm/osm ${OSM_HELM_OPTS}"
-helm upgrade --install -n $OSM_NAMESPACE --create-namespace $OSM_HELM_RELEASE ${HERE}/helm/osm ${OSM_HELM_OPTS}
+helm upgrade --install -n $OSM_NAMESPACE --create-namespace $OSM_HELM_RELEASE ${HERE}/helm/osm ${OSM_HELM_OPTS} --timeout 15m --wait
 # Override existing values.yaml with the final values.yaml used to install OSM
 helm -n $OSM_NAMESPACE get values $OSM_HELM_RELEASE | sudo tee -a ${OSM_HELM_WORK_DIR}/osm-values.yaml
 
