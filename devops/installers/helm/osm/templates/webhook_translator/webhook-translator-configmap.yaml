@@ -1,3 +1,4 @@
+{{- if not .Values.global.oldServiceAssurance -}}
 {{- if .Values.webhookTranslator.enabled -}}
 #######################################################################################
 # Copyright ETSI Contributors and Others.
@@ -22,6 +23,7 @@ metadata:
   labels:
     {{- include "osm.labels" . | nindent 4 }}
 data:
-  AIRFLOW_HOST: {{ .Values.webhookTranslator.config.airflowHost | default "airflow-webserver" }}
-  AIRFLOW_PORT: {{ default "8080" .Values.webhookTranslator.config.airflowPort | quote }}
+  AIRFLOW_HOST: "airflow-webserver"
+  AIRFLOW_PORT: "8080"
+{{- end }}
 {{- end }}

@@ -97,9 +97,10 @@ function dump_vars(){
 }
 
 # Check K8s version
-kubernetes_version=$(kubectl version | awk -Fv '/Server Version: / {print $3}')
-min_kubernetes_version="1.16.0"
-if [ "$(printf '%s\n' "$min_kubernetes_version" "$kubernetes_version" | sort -V | head -n1)" != "$min_kubernetes_version" ]; then
+kubernetes_version=`kubectl version --short | grep Server | awk '{print $3}'`
+min_kubernetes_version="v1.16.0"
+if [[ "$kubernetes_version" < "$min_kubernetes_version" ]]
+then
     echo "K8s monitoring could not be installed: Kube-prometheus-stack requires a Kubernetes 1.16+ (current version: $kubernetes_version)"
     exit 1
 fi

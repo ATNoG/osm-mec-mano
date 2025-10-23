@@ -1,3 +1,4 @@
+{{- if not .Values.global.oldServiceAssurance -}}
 {{- if .Values.webhookTranslator.enabled -}}
 #######################################################################################
 # Copyright ETSI Contributors and Others.
@@ -22,7 +23,7 @@ metadata:
   labels:
     {{- include "osm.labels" . | nindent 4 }}
 spec:
-  ingressClassName: {{ .Values.global.ingressClassName | default "nginx" }}
+  ingressClassName: nginx
   rules:
 {{- if .Values.webhookTranslator.ingress.host }}
   - host: {{ .Values.webhookTranslator.ingress.host }}
@@ -38,4 +39,5 @@ spec:
             name: webhook-translator
             port:
               number: 9998
+{{- end }}
 {{- end }}

@@ -21,14 +21,14 @@ pipeline {
 
         // Parameters to define the specific OSM version to test
         // --> Defaults to latest stable version of Release FOURTEEN
-        string(defaultValue: 'https://osm-download.etsi.org/ftp/osm-18.0-eighteen/install_osm.sh', description: 'URL to OSM installer', name: 'INSTALLER_URL')
-        string(defaultValue: 'testing-daily', description: 'Release for OSM binaries (REPO_BASE)', name: 'REPO_BASE')
-        string(defaultValue: 'testing-daily', description: 'OSM docker tag (DOCKER_TAG)', name: 'DOCKER_TAG')
+        string(defaultValue: 'https://osm-download.etsi.org/ftp/osm-17.0-seventeen/install_osm.sh', description: 'URL to OSM installer', name: 'INSTALLER_URL')
+        string(defaultValue: 'releaseseventeen-daily', description: 'Release for OSM binaries (REPO_BASE)', name: 'REPO_BASE')
+        string(defaultValue: 'releaseseventeen-daily', description: 'OSM docker tag (DOCKER_TAG)', name: 'DOCKER_TAG')
         string(defaultValue: 'testing', description: 'Repository name for OSM packages (REPO_NAME)', name: 'REPO_NAME')
 
         // Parameters for docker run
         string(defaultValue: 'opensourcemano/tests', description: 'Name of docker image for client-side of Robot tests', name: 'TEST_IMAGE')
-        string(defaultValue: 'testing-daily', description: 'Tag of docker image for client-side', name: 'TEST_TAG')
+        string(defaultValue: 'releaseseventeen-daily', description: 'Tag of docker image for client-side', name: 'TEST_TAG')
 
         // Parameters to define SSH keys (Jenkins secret) used when creating VMs
         string(defaultValue: '', description: 'Jenkins credential containing SSH private key used in VMs', name: 'SSH_PRIVATE_KEY')

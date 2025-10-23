@@ -36,7 +36,7 @@ echo "Changes in branch ${BRANCH} from ${FROM_REF} to ${TO_REF} stored in ${OSM_
 
 echo "-----------------------------------------" > "${OSM_CHANGES_FOLDER}/osm_changes-${BRANCH}-from${FROM_REF}-to${TO_REF}.log"
 
-modules="common devops IM LCM MON N2VC NBI NG-SA NG-UI osmclient RO SOL003 SOL005 tests"
+modules="common devops IM LCM MON N2VC NBI NG-SA NG-UI osmclient RO PLA POL SOL003 SOL005 tests"
 for repo in $modules; do
     echo ${repo}
     git -C ${OSM_CHANGES_FOLDER} clone "https://osm.etsi.org/gerrit/osm/${repo}"

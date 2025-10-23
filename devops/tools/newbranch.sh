@@ -26,7 +26,7 @@ BRANCH="$2"
 USER="$3"
 tag_message="Start of $BRANCH"
 
-modules="common devops IM LCM MON N2VC NBI NG-UI NG-SA osmclient RO SOL003 SOL005 tests"
+modules="common devops IM LCM MON N2VC NBI NG-UI NG-SA osmclient RO PLA POL SOL003 SOL005 tests"
 list=""
 for i in $modules; do
     if [ "$1" == "$i" -o "$1" == "all" ]; then

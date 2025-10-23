@@ -17,6 +17,7 @@
 #######################################################################################
 
 
+
 function generator_encrypted_secret_cloud_credentials() {
   local CLOUD_CREDENTIALS_FILENAME="$1"
   local SECRET_NAME="$2"
@@ -108,180 +109,6 @@ function add_providerconfig_for_gcp() {
     "${PUBLIC_KEY}" | \
   list2folder_cp_over \
     "${TARGET_FOLDER}"
-}
-
-
-# Create remote NodeGroup in AWS
-function create_nodegroup() {
-  local NODEGROUP_NAME="$1"
-  local NODEGROUP_KUSTOMIZATION_NAME="$2"
-  local CLUSTER_NAME="$3"
-  local CLUSTER_TYPE="$4"
-  local PROVIDERCONFIG_NAME="${5:-default}"
-  local VM_SIZE="$6"
-  local NODE_COUNT="$7"
-  local CLUSTER_LOCATION="$8"
-  local CONFIGMAP_NAME="${9}"
-  local NODEGROUP_ROLE="${10}"
-  local PUBLIC_KEY_MGMT="${11:-"${PUBLIC_KEY_MGMT}"}"
-  local PUBLIC_KEY_NEW_CLUSTER="${12}"
-  local PRIVATE_KEY_NEW_CLUSTER="${13:-"${PRIVATE_KEY_NEW_CLUSTER}"}"
-  local AKS_RG_NAME="${14:-""}"
-  local GKE_PREEMPTIBLE_NODES="${15:-""}"
-  local FLEET_REPO_DIR="${16:-"${FLEET_REPO_DIR}"}"
-  local FLEET_REPO_URL="${17:-""}"
-  local SW_CATALOGS_REPO_DIR="${18:-"${SW_CATALOGS_REPO_DIR}"}"
-  local SW_CATALOGS_REPO_URL="${19:-""}"
-  local SKIP_BOOTSTRAP="${20:"false"}"
-  local MGMT_PROJECT_NAME="${21:-"osm_admin"}"
-  local MGMT_CLUSTER_NAME="${22:-"_management"}"
-  local BASE_TEMPLATES_PATH="${23:-"cloud-resources"}"
-  local TEMPLATE_MANIFEST_FILENAME="${24:-"nodegroup.yaml"}"
-  local MANIFEST_FILENAME="${25:-"${NODEGROUP_NAME}.yaml"}"
-
-  # Is the provider type supported?
-  local VALID_PROVIDERS=("eks" "aks" "gke")
-  CLUSTER_TYPE="${CLUSTER_TYPE,,}"
-  [[ ! ($(echo ${VALID_PROVIDERS[@]} | grep -w "${CLUSTER_TYPE}")) ]] && return 1
-
-  # Determines the source dir for the templates and the target folder in Fleet
-  local TEMPLATES_DIR="${SW_CATALOGS_REPO_DIR}/${BASE_TEMPLATES_PATH}/eks-nodegroup/templates"
-  local TARGET_FOLDER="${FLEET_REPO_DIR}/${MGMT_PROJECT_NAME}/managed-resources/${MGMT_CLUSTER_NAME}/${CLUSTER_NAME}"
-
-  local IS_NODEGROUP_ROLE=$([[ "${NODEGROUP_ROLE}" != "default" ]]; echo $?)
-  local IS_DEFAULT_NODEGROUP_ROLE=$([[ "${NODEGROUP_ROLE}" == "default" ]]; echo $?)
-
-  local PATCH_VALUE=""
-  local COMPONENT=()
-  if [[ "${IS_NODEGROUP_ROLE}" == "0" ]];
-  then
-    PATCH_VALUE=$(cat <<EOF
-patch: |
-  apiVersion: eks.aws.upbound.io/v1beta1
-  kind: NodeGroup
-  metadata:
-    name: \${nodegroup_name}
-  spec:
-    forProvider:
-      nodeRoleArn: \${role}
-EOF
-)
-  else
-    COMPONENT=("../role")
-  fi
-
-  # Pipeline of transformations to create the cluster resource
-  export NODEGROUP_KUSTOMIZATION_NAME
-  # export OVERLAY_FOLDER
-  folder2list \
-  "${TEMPLATES_DIR}" | \
-  replace_env_vars \
-    '${NODEGROUP_KUSTOMIZATION_NAME}' | \
-  patch_replace \
-    ".spec.postBuild.substitute.nodegroup_name" \
-    "${NODEGROUP_NAME}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${NODEGROUP_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.cluster_name" \
-    "${CLUSTER_NAME}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${NODEGROUP_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.cluster_location" \
-    "${CLUSTER_LOCATION}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${NODEGROUP_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.vm_size" \
-    "${VM_SIZE}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${NODEGROUP_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.node_count" \
-    "${NODE_COUNT}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${NODEGROUP_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.providerconfig_name" \
-    "${PROVIDERCONFIG_NAME}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${NODEGROUP_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substituteFrom[0].name" \
-    "${CONFIGMAP_NAME}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${NODEGROUP_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-      ".spec.postBuild.substitute.role" \
-      "${NODEGROUP_ROLE}" \
-      "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${NODEGROUP_KUSTOMIZATION_NAME}\")" | \
-  transform_if \
-    "${IS_NODEGROUP_ROLE}" \
-    add_patch_to_kustomization_as_list \
-      "${NODEGROUP_KUSTOMIZATION_NAME}" \
-      "${PATCH_VALUE}" | \
-  transform_if \
-    "${IS_DEFAULT_NODEGROUP_ROLE}" \
-    add_component_to_kustomization_as_list \
-      "${NODEGROUP_KUSTOMIZATION_NAME}" \
-      "${COMPONENT}" | \
-  rename_file_in_items \
-    "${TEMPLATE_MANIFEST_FILENAME}" \
-    "${MANIFEST_FILENAME}" | \
-  prepend_folder_path "${NODEGROUP_KUSTOMIZATION_NAME}/" | \
-  list2folder_cp_over \
-    "${TARGET_FOLDER}"
-}
-
-
-function scale_nodegroup() {
-  local NODEGROUP_NAME="$1"
-  local NODEGROUP_KUSTOMIZATION_NAME="$2"
-  local CLUSTER_NAME="$3"
-  local CLUSTER_TYPE="$4"
-  local NODE_COUNT="$5"
-  local PUBLIC_KEY_MGMT="${6:-"${PUBLIC_KEY_MGMT}"}"
-  local PUBLIC_KEY_NEW_CLUSTER="${7}"
-  local PRIVATE_KEY_NEW_CLUSTER="${8:-"${PRIVATE_KEY_NEW_CLUSTER}"}"
-  ## `FLEET_REPO_DIR` is the result of:
-  ## "{{inputs.parameters.fleet_mount_path}}/{{inputs.parameters.cloned_fleet_folder_name}}"
-  local FLEET_REPO_DIR="${9:-"${FLEET_REPO_DIR}"}"
-  local FLEET_REPO_URL="${10:-""}"
-  ## `SW_CATALOGS_REPO_DIR` is the result of:
-  ## "{{inputs.parameters.sw_catalogs_mount_path}}/{{inputs.parameters.cloned_sw_catalogs_folder_name}}"
-  local SW_CATALOGS_REPO_DIR="${11:-"${SW_CATALOGS_REPO_DIR}"}"
-  local SW_CATALOGS_REPO_URL="${12:-""}"
-  # Only change if absolutely needeed
-  local MGMT_PROJECT_NAME="${13:-"osm_admin"}"
-  local MGMT_CLUSTER_NAME="${14:-"_management"}"
-  local BASE_TEMPLATES_PATH="${15:-"cloud-resources"}"
-  local MANIFEST_FILENAME="${16:-"${NODEGROUP_NAME}"}"
-
-  # Is the provider type supported?
-  local VALID_PROVIDERS=("eks" "aks" "gke")
-  CLUSTER_TYPE="${CLUSTER_TYPE,,}"
-  [[ ! ($(echo ${VALID_PROVIDERS[@]} | grep -w "${CLUSTER_TYPE}")) ]] && return 1
-
-  # Determines the folder in Fleet
-  local TARGET_FOLDER="${FLEET_REPO_DIR}/${MGMT_PROJECT_NAME}/managed-resources/${MGMT_CLUSTER_NAME}/${CLUSTER_NAME}/${NODEGROUP_KUSTOMIZATION_NAME}"
-
-  # Pipeline of transformations to create the cluster resource
-  export NODEGROUP_KUSTOMIZATION_NAME
-  folder2list \
-    "${TARGET_FOLDER}" | \
-  patch_replace \
-    ".spec.postBuild.substitute.node_count" \
-    "${NODE_COUNT}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${NODEGROUP_KUSTOMIZATION_NAME}\")" | \
-  list2folder_cp_over \
-    "${TARGET_FOLDER}"
-}
-
-
-# Delete nodegroup
-function delete_nodegroup() {
-  local NODEGROUP_KUSTOMIZATION_NAME="$1"
-  local CLUSTER_NAME="$2"
-  local PROJECT_NAME="${3:-"${MGMT_PROJECT_NAME}"}"
-  local FLEET_REPO_DIR="${4:-"${FLEET_REPO_DIR}"}"
-  local MGMT_RESOURCES_DIR="${5:-"${MGMT_RESOURCES_DIR}"}"
-  local NODEGROUP_DIR="${MGMT_RESOURCES_DIR}/${CLUSTER_NAME}/${NODEGROUP_KUSTOMIZATION_NAME}"
-  # Delete node Kustomizations
-  rm -rf "${NODEGROUP_DIR}"
 }
 
 
@@ -505,15 +332,16 @@ function generator_base_kustomizations_new_cluster() {
   local SW_CATALOGS_REPO_URL="$3"
   local PROJECT_NAME="${4:-"${MGMT_PROJECT_NAME}"}"
   local SW_CATALOGS_REPO_DIR="${5:-"${SW_CATALOGS_REPO_DIR}"}"
-  # Path for the source templates
-  local TEMPLATES="${6:-"${SW_CATALOGS_REPO_DIR}/cloud-resources/flux-remote-bootstrap/cluster-base/templates"}"
-  
+
   # Optional inputs:
   # Paths for each profile in the Git repo
-  local INFRA_CONTROLLERS_PATH="${7:-"${PROJECT_NAME}/infra-controller-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
-  local INFRA_CONFIGS_PATH="${8:-"${PROJECT_NAME}/infra-config-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
-  local MANAGED_RESOURCES_PATH="${9:-"${PROJECT_NAME}/managed-resources/${CLUSTER_KUSTOMIZATION_NAME}"}"
-  local APPS_PATH="${10:-"${PROJECT_NAME}/app-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
+  local INFRA_CONTROLLERS_PATH="${6:-"${PROJECT_NAME}/infra-controller-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
+  local INFRA_CONFIGS_PATH="${7:-"${PROJECT_NAME}/infra-config-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
+  local MANAGED_RESOURCES_PATH="${8:-"${PROJECT_NAME}/managed-resources/${CLUSTER_KUSTOMIZATION_NAME}"}"
+  local APPS_PATH="${9:-"${PROJECT_NAME}/app-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
+
+  # Path for the source templates
+  local TEMPLATES="${SW_CATALOGS_REPO_DIR}/cloud-resources/flux-remote-bootstrap/cluster-base/templates"
 
   # Generate
   export CLUSTER_KUSTOMIZATION_NAME
@@ -555,7 +383,6 @@ function generator_k8s_age_secret_new_cluster() {
   local PRIVATE_KEY_NEW_CLUSTER="$1"
   local PUBLIC_KEY_MGMT="$2"
   local CLUSTER_AGE_SECRET_NAME="${3:-$(safe_name "sops-age-${CLUSTER_KUSTOMIZATION_NAME}")}"
-  local CLUSTER_AGE_SECRET_NAMESPACE="${4:-"managed-resources"}"
 
   join_lists \
     <(cat) \
@@ -563,7 +390,7 @@ function generator_k8s_age_secret_new_cluster() {
       echo "${PRIVATE_KEY_NEW_CLUSTER}" | \
       grep -v '^#' | \
       kubectl create secret generic "${CLUSTER_AGE_SECRET_NAME}" \
-        --namespace="${CLUSTER_AGE_SECRET_NAMESPACE}" \
+        --namespace=managed-resources \
         --from-file=agekey=/dev/stdin \
         -o yaml --dry-run=client | \
       encrypt_secret_from_stdin \
@@ -577,31 +404,19 @@ function generator_k8s_age_secret_new_cluster() {
 # Generate bootstrap manifests for new cluster from the management cluster
 function generator_bootstrap_new_cluster() {
   local CLUSTER_NAME="$1"
-  local CLUSTER_KUSTOMIZATION_NAME="${2:-$(safe_name ${CLUSTER_NAME})}"
+  local CLUSTER_KUSTOMIZATION_NAME="${2:$(safe_name ${CLUSTER_NAME})}"
   local CLUSTER_AGE_SECRET_NAME="${3:-$(safe_name "sops-age-${CLUSTER_KUSTOMIZATION_NAME}")}"
   local SW_CATALOGS_REPO_DIR="${4:-"${SW_CATALOGS_REPO_DIR}"}"
-  local BOOTSTRAP_KUSTOMIZATION_NAMESPACE="${5:-"managed-resources"}"
-  local CLUSTER_KUSTOMIZATION_NAMESPACE="${6:-"managed-resources"}"
-  local BOOTSTRAP_SECRET_NAMESPACE="${7:-"managed-resources"}"
 
   # Paths and names for the templates
-  local MANIFEST_FILENAME="${8:-"cluster-bootstrap-${CLUSTER_KUSTOMIZATION_NAME}.yaml"}"
-  local TEMPLATES="${9:-"${SW_CATALOGS_REPO_DIR}/cloud-resources/flux-remote-bootstrap/bootstrap/templates"}"
-  local TEMPLATE_MANIFEST_FILENAME="${10:-"remote-cluster-bootstrap.yaml"}"
-
-  # Variables for kubeconfig secret configuration
-  local CLUSTER_KUBECONFIG_SECRET_KEY=${CLUSTER_KUBECONFIG_SECRET_KEY:-"kubeconfig"}
-  local CLUSTER_KUBECONFIG_SECRET_NAME=${CLUSTER_KUBECONFIG_SECRET_NAME:-"kubeconfig-${CLUSTER_KUSTOMIZATION_NAME}"}
+  local MANIFEST_FILENAME="${5:-"cluster-bootstrap-${CLUSTER_KUSTOMIZATION_NAME}.yaml"}"
+  local TEMPLATES="${6:-"${SW_CATALOGS_REPO_DIR}/cloud-resources/flux-remote-bootstrap/bootstrap/templates"}"
+  local TEMPLATE_MANIFEST_FILENAME="${7:-"remote-cluster-bootstrap.yaml"}"
 
   # Generate manifests
   export CLUSTER_KUSTOMIZATION_NAME
   export CLUSTER_NAME
   export CLUSTER_AGE_SECRET_NAME
-  export CLUSTER_KUBECONFIG_SECRET_KEY
-  export CLUSTER_KUBECONFIG_SECRET_NAME
-  export BOOTSTRAP_KUSTOMIZATION_NAMESPACE
-  export CLUSTER_KUSTOMIZATION_NAMESPACE
-  export BOOTSTRAP_SECRET_NAMESPACE
 
   join_lists \
     <(cat) \
@@ -612,7 +427,7 @@ function generator_bootstrap_new_cluster() {
         "${TEMPLATE_MANIFEST_FILENAME}" \
         "${MANIFEST_FILENAME}" | \
       replace_env_vars \
-        '${CLUSTER_KUSTOMIZATION_NAME},${CLUSTER_NAME},${CLUSTER_AGE_SECRET_NAME},${CLUSTER_KUBECONFIG_SECRET_KEY},${CLUSTER_KUBECONFIG_SECRET_NAME},${CLUSTER_KUSTOMIZATION_NAMESPACE},${BOOTSTRAP_KUSTOMIZATION_NAMESPACE},${BOOTSTRAP_SECRET_NAMESPACE}'
+        '${CLUSTER_KUSTOMIZATION_NAME},${CLUSTER_NAME},${CLUSTER_AGE_SECRET_NAME}'
       )
 }
 
@@ -682,16 +497,10 @@ function create_bootstrap_for_remote_cluster() {
   local PUBLIC_KEY_NEW_CLUSTER="$9"
   local PRIVATE_KEY_NEW_CLUSTER="${10:-${PRIVATE_KEY_NEW_CLUSTER}}"
   local IMPORTED_CLUSTER="${11:-"false"}"
-  local MGMT_CLUSTER_NAME="${12:-"_management"}"
-  local CLUSTER_KUBECONFIG_SECRET_NAME=${13:-"kubeconfig-${CLUSTER_KUSTOMIZATION_NAME}"}
-  local CLUSTER_KUBECONFIG_SECRET_KEY=${14:-"kubeconfig"}
-  local TEMPLATES_DIR="${15:-"${SW_CATALOGS_REPO_DIR}/cloud-resources/flux-remote-bootstrap/cluster-base/templates"}"
-  local BOOTSTRAP_KUSTOMIZATION_NAMESPACE="${16:-"managed-resources"}"
-  local CLUSTER_KUSTOMIZATION_NAMESPACE="${17:-"managed-resources"}"
-  local BOOTSTRAP_SECRET_NAMESPACE="${18:-"${BOOTSTRAP_KUSTOMIZATION_NAMESPACE}"}"
 
-  # Calculates the folder where managed resources are defined
-  local MGMT_RESOURCES_DIR="${FLEET_REPO_DIR}/${MGMT_PROJECT_NAME}/managed-resources/${MGMT_CLUSTER_NAME}"
+
+  # Calculates the folder where managed resources area defined
+  local MGMT_RESOURCES_DIR="${FLEET_REPO_DIR}/${MGMT_PROJECT_NAME}/managed-resources/_management"
 
   # Create profile folders
   echo "" | \
@@ -710,8 +519,7 @@ function create_bootstrap_for_remote_cluster() {
     "${FLEET_REPO_URL}" \
     "${SW_CATALOGS_REPO_URL}" \
     "${MGMT_PROJECT_NAME}" \
-    "${SW_CATALOGS_REPO_DIR}" \
-    "${TEMPLATES_DIR}" | \
+    "${SW_CATALOGS_REPO_DIR}" | \
   list2folder_cp_over \
     "${CLUSTER_FOLDER}"
 
@@ -734,15 +542,11 @@ function create_bootstrap_for_remote_cluster() {
     "${CLUSTER_NAME}" \
     "${CLUSTER_KUSTOMIZATION_NAME}" \
     "${CLUSTER_AGE_SECRET_NAME}" \
-    "${SW_CATALOGS_REPO_DIR}" \
-    "${BOOTSTRAP_KUSTOMIZATION_NAMESPACE}" \
-    "${CLUSTER_KUSTOMIZATION_NAMESPACE}" \
-    "${BOOTSTRAP_SECRET_NAMESPACE}" | \
+    "${SW_CATALOGS_REPO_DIR}" | \
   generator_k8s_age_secret_new_cluster \
     "${PRIVATE_KEY_NEW_CLUSTER}" \
     "${PUBLIC_KEY_MGMT}" \
-    "${CLUSTER_AGE_SECRET_NAME}" \
-    "${BOOTSTRAP_SECRET_NAMESPACE}" | \
+    "${CLUSTER_AGE_SECRET_NAME}" | \
   prepend_folder_path "${CLUSTER_KUSTOMIZATION_NAME}/" | \
   list2folder_cp_over \
     "${MGMT_RESOURCES_DIR}"
@@ -773,12 +577,12 @@ function disconnect_flux_remote_cluster() {
 
   # Calculates key folders
   ## Base folder with Kustomizations for the new cluster
-  # local CLUSTER_FOLDER="${FLEET_REPO_DIR}/clusters/${CLUSTER_KUSTOMIZATION_NAME}"
+  local CLUSTER_FOLDER="${FLEET_REPO_DIR}/clusters/${CLUSTER_KUSTOMIZATION_NAME}"
   ## Folder where managed resources are defined in the management cluster
   local MGMT_RESOURCES_CLUSTER_DIR="${FLEET_REPO_DIR}/${MGMT_PROJECT_NAME}/managed-resources/_management/${CLUSTER_KUSTOMIZATION_NAME}"
 
-  # Delete Flux resources synchronized directly from remote cluster
-  # rm -rf "${CLUSTER_FOLDER}/flux-system"
+  # Delete Flux resources syncronized directly from remote cluster
+  rm -rf "${CLUSTER_FOLDER}/flux-system"
 
   # Delete Flux resources bootstraped remotely
   rm -rf "${MGMT_RESOURCES_CLUSTER_DIR}/cluster-bootstrap-${CLUSTER_KUSTOMIZATION_NAME}.yaml"
@@ -817,102 +621,22 @@ function create_crossplane_cluster() {
   local MGMT_PROJECT_NAME="${19:-"osm_admin"}"
   local MGMT_CLUSTER_NAME="${20:-"_management"}"
   local BASE_TEMPLATES_PATH="${21:-"cloud-resources"}"
-  # EKS only
-  local CLUSTER_IAM_ROLE="${22}"
-  local CLUSTER_PRIVATE_SUBNETS_ID="${23}"
-  local CLUSTER_PUBLIC_SUBNETS_ID="${24}"
-  local CONFIGMAP_NAME="${25}"
-  local TEMPLATE_MANIFEST_FILENAME="${26:-"${CLUSTER_TYPE,,}01.yaml"}"
-  local MANIFEST_FILENAME="${27:-"${CLUSTER_TYPE,,}-${CLUSTER_NAME}.yaml"}"
+  local TEMPLATE_MANIFEST_FILENAME="${22:-"${CLUSTER_TYPE,,}01.yaml"}"
+  local MANIFEST_FILENAME="${23:-"${CLUSTER_TYPE,,}-${CLUSTER_NAME}.yaml"}"
+
 
   # Is the provider type supported?
   local VALID_PROVIDERS=("eks" "aks" "gke")
   CLUSTER_TYPE="${CLUSTER_TYPE,,}"
   [[ ! ($(echo ${VALID_PROVIDERS[@]} | grep -w "${CLUSTER_TYPE}")) ]] && return 1
 
-  # Determine which optional steps may be needed
-  local IS_EKS=$([[ "${CLUSTER_TYPE}" == "eks" ]]; echo $?)
-  local IS_AKS=$([[ "${CLUSTER_TYPE}" == "aks" ]]; echo $?)
-  local IS_GCP=$([[ "${CLUSTER_TYPE}" == "gcp" ]]; echo $?)
-
-  local IS_EKS_AND_IAM=1
-  local IAM_COMPONENTS=()
-  local PATCH_SUBNET=0
-  local PATCH_IAM=0
-  local PATCH_VALUE=""
-  local PATCH=1
-  local CONFIG=1
-
-  if [[ "$IS_EKS" -eq 0 ]]; then
-
-    # Check for subnet config
-    if [[ "$CLUSTER_PRIVATE_SUBNETS_ID" == "default" ]]; then
-      IS_EKS_AND_IAM=0
-      IAM_COMPONENTS+=("../network")
-    else
-      PATCH_SUBNET=1
-    fi
-
-    # Check for IAM role config
-    if [[ "$CLUSTER_IAM_ROLE" == "default" ]]; then
-      IS_EKS_AND_IAM=0
-      IAM_COMPONENTS+=("../iam")
-    else
-      PATCH_IAM=1
-    fi
-
-    # Set PATCH flag if patch is required
-    if [[ $PATCH_SUBNET -eq 1 || $PATCH_IAM -eq 1 ]]; then
-      # PATCH=1
-      echo "Generating patch..."
-
-      PATCH_VALUE=$(cat <<EOF
-  patch: |
-    apiVersion: eks.aws.upbound.io/v1beta1
-    kind: Cluster
-    metadata:
-      name: \${cluster_resource_name}-cluster
-    spec:
-      forProvider:
-EOF
-  )
-
-      # Append subnet block if needed
-      if [[ $PATCH_SUBNET -eq 1 ]]; then
-        PATCH_VALUE+=$(cat <<EOF
-
-        vpcConfig:
-          - endpointPrivateAccess: true
-            endpointPublicAccess: true
-            subnetIds: \${private_subnets}
-EOF
-  )
-      fi
-
-      # Append IAM role block if needed
-      if [[ $PATCH_IAM -eq 1 ]]; then
-        PATCH_VALUE+=$(cat <<EOF
-
-        roleArn: \${cluster_iam_role}
-EOF
-  )
-      fi
-    fi
-
-    # Set PATCH flag
-    if [[ "$PATCH_SUBNET" -eq 1 || "$PATCH_IAM" -eq 1 ]]; then
-      PATCH=0
-    fi
-
-    # Set CONFIG flag
-    if [[ "$CONFIGMAP_NAME" != "default" ]]; then
-      CONFIG=0
-    fi
-  fi
-
   # Determines the source dir for the templates and the target folder in Fleet
   local TEMPLATES_DIR="${SW_CATALOGS_REPO_DIR}/${BASE_TEMPLATES_PATH}/${CLUSTER_TYPE}/templates"
   local TARGET_FOLDER="${FLEET_REPO_DIR}/${MGMT_PROJECT_NAME}/managed-resources/${MGMT_CLUSTER_NAME}"
+
+  # Determine which optional steps may be needed
+  local IS_AKS=$([[ "${CLUSTER_TYPE}" == "aks" ]]; echo $?)
+  local IS_GCP=$([[ "${CLUSTER_TYPE}" == "gcp" ]]; echo $?)
 
   # Pipeline of transformations to create the cluster resource
   export CLUSTER_KUSTOMIZATION_NAME
@@ -941,10 +665,6 @@ EOF
     "${K8S_VERSION}" \
     "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
   patch_replace \
-    ".spec.postBuild.substitute.cluster_iam_role" \
-    "${CLUSTER_IAM_ROLE}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
     ".spec.postBuild.substitute.providerconfig_name" \
     "${PROVIDERCONFIG_NAME}" \
     "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
@@ -960,24 +680,10 @@ EOF
       ".spec.postBuild.substitute.preemptible_nodes" \
       "${GKE_PREEMPTIBLE_NODES}" \
       "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  transform_if \
-    "${PATCH}" \
-    add_patch_to_kustomization_as_list \
-      "${CLUSTER_KUSTOMIZATION_NAME}" \
-      "${PATCH_VALUE}" | \
-  transform_if \
-    "${IS_EKS_AND_IAM}" \
-    add_component_to_kustomization_as_list \
-      "${CLUSTER_KUSTOMIZATION_NAME}" \
-      "${IAM_COMPONENTS[@]}" | \
-  transform_if \
-    "${CONFIG}" \
-    add_config_to_kustomization \
-      "${CLUSTER_KUSTOMIZATION_NAME}" | \
   rename_file_in_items \
     "${TEMPLATE_MANIFEST_FILENAME}" \
     "${MANIFEST_FILENAME}" | \
-  prepend_folder_path "${CLUSTER_KUSTOMIZATION_NAME}/clusterbase/" | \
+  prepend_folder_path "${CLUSTER_KUSTOMIZATION_NAME}/" | \
   list2folder_cp_over \
     "${TARGET_FOLDER}"
 
@@ -1005,24 +711,13 @@ function delete_remote_cluster() {
   local PROJECT_NAME="${2:-"${MGMT_PROJECT_NAME}"}"
   local FLEET_REPO_DIR="${3:-"${FLEET_REPO_DIR}"}"
   local MGMT_RESOURCES_DIR="${4:-"${MGMT_RESOURCES_DIR}"}"
-  local MGMT_CLUSTER_NAME="${5:-"${MGMT_CLUSTER_NAME}"}"
 
   # Optional inputs: Paths for each profile in the Git repo
-  local INFRA_CONTROLLERS_DIR="${6:-"${FLEET_REPO_DIR}/${PROJECT_NAME}/infra-controller-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
-  local INFRA_CONFIGS_DIR="${7:-"${FLEET_REPO_DIR}/${PROJECT_NAME}/infra-config-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
-  local MANAGED_RESOURCES_DIR="${8:-"${FLEET_REPO_DIR}/${PROJECT_NAME}/managed-resources/${CLUSTER_KUSTOMIZATION_NAME}"}"
-  local APPS_DIR="${9:-"${FLEET_REPO_DIR}/${PROJECT_NAME}/app-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
-  local CLUSTER_DIR="${10:-"${FLEET_REPO_DIR}/clusters/${CLUSTER_KUSTOMIZATION_NAME}"}"
-
-  # Optional input: Do I need a purge operation first?
-  local PURGE="${11:-"false"}"
-
-  # Perform the purge if needed
-  if [[ "${PURGE,,}" == "true" ]]; then
-    echo "Purging the remote Flux instalation..."
-  fi
-
-  echo "Deleting cluster profiles and (when applicable) its cloud resources..."
+  local INFRA_CONTROLLERS_DIR="${5:-"${FLEET_REPO_DIR}/${PROJECT_NAME}/infra-controller-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
+  local INFRA_CONFIGS_DIR="${6:-"${FLEET_REPO_DIR}/${PROJECT_NAME}/infra-config-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
+  local MANAGED_RESOURCES_DIR="${7:-"${FLEET_REPO_DIR}/${PROJECT_NAME}/managed-resources/${CLUSTER_KUSTOMIZATION_NAME}"}"
+  local APPS_DIR="${8:-"${FLEET_REPO_DIR}/${PROJECT_NAME}/app-profiles/${CLUSTER_KUSTOMIZATION_NAME}"}"
+  local CLUSTER_DIR="${9:-"${FLEET_REPO_DIR}/clusters/${CLUSTER_KUSTOMIZATION_NAME}"}"
 
   # Delete profile folders
   rm -rf "${INFRA_CONTROLLERS_DIR}"
@@ -1030,15 +725,10 @@ function delete_remote_cluster() {
   rm -rf "${MANAGED_RESOURCES_DIR}"
   rm -rf "${APPS_DIR}"
 
-  if [ -n "${MGMT_CLUSTER_NAME}" ]; then
-    CLUSTER_DIR_IN_MGMT_CLUSTER="${9:-"${FLEET_REPO_DIR}/${PROJECT_NAME}/managed-resources/${MGMT_CLUSTER_DIR}/${CLUSTER_KUSTOMIZATION_NAME}"}"
-    rm -rf "${CLUSTER_DIR_IN_MGMT_CLUSTER}"
-  fi
-
   # Delete base cluster Kustomizations
   rm -rf "${CLUSTER_DIR}"
 
-  # Delete cluster resources if managed by OSM (otherwise, this will be ignored)
+  # Delete cluster resources
   rm -rf "${MGMT_RESOURCES_DIR}/${CLUSTER_KUSTOMIZATION_NAME}"
 }
 
@@ -1120,458 +810,6 @@ function update_crossplane_cluster() {
     "${MANIFEST_FILENAME}"
 }
 
-# Create remote CAPI cluster for Openstack
-function create_capi_openstack_cluster() {
-  local CLUSTER_KUSTOMIZATION_NAME="${1}"
-  local CLUSTER_NAME="${2}"
-  local VM_SIZE="${3}"
-  local VM_SIZE_CONTROL_PLANE="${4:-"${VM_SIZE}"}"
-  local NODE_COUNT="${5}"
-  local NODE_COUNT_CONTROLPLANE="${6:-"1"}"
-  local K8S_VERSION="${7}"
-  # OpenStack specific
-  local OPENSTACK_CLOUD_NAME="${8}"
-  local OPENSTACK_DNS_NAMESERVERS="${9}"
-  local OPENSTACK_EXTERNAL_NETWORK_ID="${10}"
-  local OPENSTACK_FAILURE_DOMAIN="${11}"
-  local OPENSTACK_SSH_KEY_NAME="${12}"
-  local CNI="${13:-"calico"}"
-  local OPENSTACK_WORKER_IMAGE_NAME="${14:-"osm-capo-node-${K8S_VERSION}"}"
-  local OPENSTACK_CONTROL_PLANE_IMAGE_NAME="${15:-"${OPENSTACK_WORKER_IMAGE_NAME}"}"
-  # SOPS-AGE related
-  local PUBLIC_KEY_MGMT="${16:-"${PUBLIC_KEY_MGMT}"}"
-  local PUBLIC_KEY_NEW_CLUSTER="${17:-"${PUBLIC_KEY_NEW_CLUSTER}"}"
-  local PRIVATE_KEY_NEW_CLUSTER="${18:-"${PRIVATE_KEY_NEW_CLUSTER}"}"
-  # GitOps retaled
-  local FLEET_REPO_DIR="${19:-"${FLEET_REPO_DIR}"}"
-  local FLEET_REPO_URL="${20:-"${FLEET_REPO_URL}"}"
-  local SW_CATALOGS_REPO_DIR="${21:-"${SW_CATALOGS_REPO_DIR}"}"
-  local SW_CATALOGS_REPO_URL="${22:-"${SW_CATALOGS_REPO_URL}"}"
-  local SKIP_BOOTSTRAP="${23:-"false"}"
-  local MGMT_PROJECT_NAME="${24:-"osm_admin"}"
-  local MGMT_CLUSTER_NAME="${25:-"_management"}"
-  local BASE_TEMPLATES_PATH="${26:-"cloud-resources/capi"}"
-  local CAPO_RESOURCES_NAMESPACE="${27:-"managed-resources"}"
-
-  # Varibles with valus from convention.
-  local CLUSTER_TYPE="openstack"
-  local TEMPLATE_MANIFEST_FILENAME="capi-cluster.yaml"
-  local MANIFEST_FILENAME="openstack-${CLUSTER_NAME}.yaml"
-  local CLOUD_CREDENTIALS="${OPENSTACK_CLOUD_NAME}-capo-config"
-
-  # Determines the source dir for the templates and the target folder in Fleet
-  local TEMPLATES_DIR="${SW_CATALOGS_REPO_DIR}/${BASE_TEMPLATES_PATH}/openstack-kubeadm/templates"
-  local TARGET_FOLDER="${FLEET_REPO_DIR}/${MGMT_PROJECT_NAME}/managed-resources/${MGMT_CLUSTER_NAME}"
-  export CNI=${CNI,,}
-
-  # Variables for kubeconfig secret reference
-  export CLUSTER_KUBECONFIG_SECRET_NAME="${CLUSTER_KUSTOMIZATION_NAME}-kubeconfig"
-  export CLUSTER_KUBECONFIG_SECRET_KEY="value"
-
-  export CLUSTER_KUSTOMIZATION_NAME
-  export OPENSTACK_CLOUD_NAME
-
-  folder2list \
-    "${TEMPLATES_DIR}" | \
-  replace_env_vars \
-    '${CLUSTER_KUSTOMIZATION_NAME},${CNI},${CLUSTER_KUBECONFIG_SECRET_NAME},${CLUSTER_KUBECONFIG_SECRET_KEY},${OPENSTACK_CLOUD_NAME}' | \
-  patch_replace \
-    ".spec.postBuild.substitute.cluster_name" \
-    "${CLUSTER_NAME}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.cni" \
-    "${CNI}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.control_plane_machine_count" \
-    "${NODE_COUNT_CONTROLPLANE}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.kubernetes_version" \
-    "v${K8S_VERSION}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.namespace" \
-    "${CAPO_RESOURCES_NAMESPACE}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.worker_machine_count" \
-    "${NODE_COUNT}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.openstack_cloud" \
-    "${OPENSTACK_CLOUD_NAME}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.openstack_cloud_conf" \
-    "${CLOUD_CREDENTIALS}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.openstack_control_plane_machine_flavor" \
-    "${VM_SIZE_CONTROL_PLANE}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.openstack_dns_nameservers" \
-    "${OPENSTACK_DNS_NAMESERVERS}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.openstack_external_network_id" \
-    "${OPENSTACK_EXTERNAL_NETWORK_ID}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.openstack_failure_domain" \
-    "${OPENSTACK_FAILURE_DOMAIN}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.openstack_worker_image_name" \
-    "${OPENSTACK_WORKER_IMAGE_NAME}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.openstack_control_plane_image_name" \
-    "${OPENSTACK_CONTROL_PLANE_IMAGE_NAME}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.openstack_node_machine_flavor" \
-    "${VM_SIZE}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.openstack_ssh_key_name" \
-    "${OPENSTACK_SSH_KEY_NAME}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  rename_file_in_items \
-    "${TEMPLATE_MANIFEST_FILENAME}" \
-    "${MANIFEST_FILENAME}" | \
-  prepend_folder_path "${CLUSTER_KUSTOMIZATION_NAME}/" | \
-  list2folder_cp_over \
-    "${TARGET_FOLDER}"
-  
-  # Bootstrap (unless asked to skip)
-  if [[ "${SKIP_BOOTSTRAP,,}" == "true" ]]; then
-    return 0
-  fi
-  
-  create_bootstrap_for_remote_cluster \
-    "${CLUSTER_NAME}" \
-    "${CLUSTER_KUSTOMIZATION_NAME}" \
-    "${FLEET_REPO_DIR}" \
-    "${SW_CATALOGS_REPO_DIR}" \
-    "${FLEET_REPO_URL}" \
-    "${SW_CATALOGS_REPO_URL}" \
-    "${MGMT_PROJECT_NAME}" \
-    "${PUBLIC_KEY_MGMT}" \
-    "${PUBLIC_KEY_NEW_CLUSTER}" \
-    "${PRIVATE_KEY_NEW_CLUSTER}" \
-    "false" \
-    '' \
-    "${CLUSTER_KUBECONFIG_SECRET_NAME}" \
-    "${CLUSTER_KUBECONFIG_SECRET_KEY}"
-
-}
-
-# Update remote CAPI cluster for Openstack
-function update_capi_openstack_cluster() {
-  local CLUSTER_KUSTOMIZATION_NAME="${1}"
-  local CLUSTER_NAME="${2}"
-  local VM_SIZE="${3}"
-  local VM_SIZE_CONTROL_PLANE="${4:-"${VM_SIZE}"}"
-  local NODE_COUNT="${5}"
-  local NODE_COUNT_CONTROLPLANE="${6:-"1"}"
-  local K8S_VERSION="${7}"
-  # OpenStack specific
-  local OPENSTACK_CLOUD_NAME="${8}"
-  local OPENSTACK_DNS_NAMESERVERS="${9}"
-  local OPENSTACK_EXTERNAL_NETWORK_ID="${10}"
-  local OPENSTACK_FAILURE_DOMAIN="${11}"
-  local OPENSTACK_SSH_KEY_NAME="${12}"
-  local CNI="${13:-"calico"}"
-  local OPENSTACK_WORKER_IMAGE_NAME="${14:-"osm-capo-node-${K8S_VERSION}"}"
-  local OPENSTACK_CONTROL_PLANE_IMAGE_NAME="${15:-"${OPENSTACK_WORKER_IMAGE_NAME}"}"
-  # SOPS-AGE related
-  local PUBLIC_KEY_MGMT="${16:-"${PUBLIC_KEY_MGMT}"}"
-  local PUBLIC_KEY_NEW_CLUSTER="${17:-"${PUBLIC_KEY_NEW_CLUSTER}"}"
-  local PRIVATE_KEY_NEW_CLUSTER="${18:-"${PRIVATE_KEY_NEW_CLUSTER}"}"
-  # GitOps retaled
-  local FLEET_REPO_DIR="${19:-"${FLEET_REPO_DIR}"}"
-  local FLEET_REPO_URL="${20:-"${FLEET_REPO_URL}"}"
-  local SW_CATALOGS_REPO_DIR="${21:-"${SW_CATALOGS_REPO_DIR}"}"
-  local SW_CATALOGS_REPO_URL="${22:-"${SW_CATALOGS_REPO_URL}"}"
-  local SKIP_BOOTSTRAP="${23:-"false"}"
-  local MGMT_PROJECT_NAME="${24:-"osm_admin"}"
-  local MGMT_CLUSTER_NAME="${25:-"_management"}"
-  local BASE_TEMPLATES_PATH="${26:-"cloud-resources/capi"}"
-  local CAPO_RESOURCES_NAMESPACE="${27:-"managed-resources"}"
-  
-  # Determine key folders in Fleet
-  local MGMT_RESOURCES_DIR="${FLEET_REPO_DIR}/${MGMT_PROJECT_NAME}/managed-resources/${MGMT_CLUSTER_NAME}"
-
-  # Updating no new cluster
-  local SKIP_BOOTSTRAP="true"
-  
-  create_capi_openstack_cluster \
-    "${CLUSTER_KUSTOMIZATION_NAME}" \
-    "${CLUSTER_NAME}" \
-    "${VM_SIZE}" \
-    "${VM_SIZE_CONTROL_PLANE}" \
-    "${NODE_COUNT}" \
-    "${NODE_COUNT_CONTROLPLANE}" \
-    "${K8S_VERSION}" \
-    "${OPENSTACK_CLOUD_NAME}" \
-    "${OPENSTACK_DNS_NAMESERVERS}" \
-    "${OPENSTACK_EXTERNAL_NETWORK_ID}" \
-    "${OPENSTACK_FAILURE_DOMAIN}" \
-    "${OPENSTACK_SSH_KEY_NAME}" \
-    "${CNI}" \
-    "${OPENSTACK_WORKER_IMAGE_NAME}" \
-    "${OPENSTACK_CONTROL_PLANE_IMAGE_NAME}" \
-    "${PUBLIC_KEY_MGMT}" \
-    "${PUBLIC_KEY_NEW_CLUSTER}" \
-    "${PRIVATE_KEY_NEW_CLUSTER}" \
-    "${FLEET_REPO_DIR}" \
-    "${FLEET_REPO_URL}" \
-    "${SW_CATALOGS_REPO_DIR}" \
-    "${SW_CATALOGS_REPO_URL}" \
-    "${SKIP_BOOTSTRAP}" \
-    "${MGMT_PROJECT_NAME}" \
-    "${MGMT_CLUSTER_NAME}" \
-    "${BASE_TEMPLATES_PATH}" \
-    "${CAPO_RESOURCES_NAMESPACE}"
-}
-
-# Create remote Openshift cluster via ACM
-function create_openshift_cluster {
-  local CLUSTER_KUSTOMIZATION_NAME="${1}"
-  local CLUSTER_NAME="${2}"
-  # This has to be void. Stored in database
-  local K8S_VERSION="${3:-"''"}"
-  # SOPS-AGE related
-  local PUBLIC_KEY_ACM="${4}"
-  local PUBLIC_KEY_NEW_CLUSTER="${5:-"${PUBLIC_KEY_NEW_CLUSTER}"}"
-  local PRIVATE_KEY_NEW_CLUSTER="${6:-"${PRIVATE_KEY_NEW_CLUSTER}"}"
-  # OpenShift
-  local OPENSHIFT_RELEASE="${7}"
-  local INFRA_PUBLIC_SSH_KEY="${8}"
-  local CONTROL_PLANE_AVAILABILITY="${9}"
-  local WORKER_COUNT="${10}"
-  local WORKER_CORES="${11}"
-  local WORKER_MEMORY="${12}"
-  local WORKER_VOLUME_SIZE="${13}"
-  local STORAGE_CLASS="${14}"
-  local BASE_DOMAIN="${15}"
-  local MGMT_CLUSTER_NAME="${16}"
-  local HOSTED_CLUSTERS_PROJECT="${17:-"clusters"}"
-  local ETCD_VOLUME_SIZE="${18:-"8"}"
-  # GitOps retaled
-  local FLEET_REPO_DIR="${19:-"${FLEET_REPO_DIR}"}"
-  local FLEET_REPO_URL="${20:-"${FLEET_REPO_URL}"}"
-  local SW_CATALOGS_REPO_DIR="${21:-"${SW_CATALOGS_REPO_DIR}"}"
-  local SW_CATALOGS_REPO_URL="${22:-"${SW_CATALOGS_REPO_URL}"}"
-  local SKIP_BOOTSTRAP="${23:-"false"}"
-   # Only change if absolutely needeed
-  local MGMT_PROJECT_NAME="${24:-"osm_admin"}"
-  local BASE_TEMPLATES_PATH="${25:-"cloud-resources"}"
-  local TEMPLATE_MANIFEST_FILENAME="${26:-"openshift01.yaml"}"
-  local MANIFEST_FILENAME="${27:-"openshift-${CLUSTER_NAME}.yaml"}"
-  
-  local TEMPLATES_DIR="${SW_CATALOGS_REPO_DIR}/cloud-resources/openshift/templates"
-  local TARGET_FOLDER="${FLEET_REPO_DIR}/${MGMT_PROJECT_NAME}/managed-resources/${MGMT_CLUSTER_NAME}"
-
-  # Internally ACM creates several projects for each cluster.
-  # Specifically the klusterletaddonconfig must land in a project with the same name as the cluster.
-  # This will be specifically controlled by the variable `CLUSTER_PROJECT`.
-  #
-  # It must be notes that CLUSTER_NAME, CLUSTER_KUSTOMIZATION_NAME and CLUSTER_PROJECT have the same value,
-  # but they are conceptually different.
-  local CLUSTER_PROJECT="${CLUSTER_KUSTOMIZATION_NAME}"
-
-  export CLUSTER_KUSTOMIZATION_NAME
-
-  folder2list \
-    "${TEMPLATES_DIR}" | \
-  replace_env_vars \
-    '${CLUSTER_KUSTOMIZATION_NAME}' | \
-  patch_replace \
-    ".spec.postBuild.substitute.base_domain" \
-    "${BASE_DOMAIN}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.cluster_name" \
-    "${CLUSTER_NAME}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.cluster_project" \
-    "${CLUSTER_PROJECT}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.hosted_cluster_project" \
-    "${HOSTED_CLUSTERS_PROJECT}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.etcd_volume_size" \
-    "${ETCD_VOLUME_SIZE}Gi" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.openshift_release" \
-    "${OPENSHIFT_RELEASE}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.storage_class" \
-    "${STORAGE_CLASS}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.control_plane_availability" \
-    "${CONTROL_PLANE_AVAILABILITY}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.worker_count" \
-    "${WORKER_COUNT}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.worker_cores" \
-    "${WORKER_CORES}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.worker_memory" \
-    "${WORKER_MEMORY}Gi" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.worker_volume_size" \
-    "${WORKER_VOLUME_SIZE}Gi" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}\")" | \
-  patch_replace \
-    ".spec.postBuild.substitute.cluster_project" \
-    "${CLUSTER_PROJECT}" \
-    "| select(.kind == \"Kustomization\") | select(.metadata.name == \"${CLUSTER_KUSTOMIZATION_NAME}-ns\")" | \
-  rename_file_in_items \
-    "${TEMPLATE_MANIFEST_FILENAME}" \
-    "${MANIFEST_FILENAME}" | \
-  prepend_folder_path "${CLUSTER_KUSTOMIZATION_NAME}/" | \
-  list2folder_cp_over \
-    "${TARGET_FOLDER}"
-
-  echo "" | \
-  make_generator \
-    "pull-secret.yaml" \
-    kubectl_encrypt \
-      "${PUBLIC_KEY_ACM}" \
-      create \
-      secret \
-      generic \
-      "pullsecret-cluster-${CLUSTER_NAME}" \
-      --namespace="${HOSTED_CLUSTERS_PROJECT}" \
-      --from-file=".dockerconfigjson"=<(echo "${DOCKERCONFIGJSON}") \
-      -o=yaml \
-      --dry-run=client | \
-  make_generator \
-    "ssh-key-secret.yaml" \
-    kubectl_encrypt \
-      "${PUBLIC_KEY_ACM}" \
-      create \
-      secret \
-      generic \
-      "sshkey-cluster-${CLUSTER_NAME}" \
-      --namespace="${HOSTED_CLUSTERS_PROJECT}" \
-      --from-file='id_rsa.pub'=<(echo "${INFRA_PUBLIC_SSH_KEY}") \
-      -o=yaml \
-      --dry-run=client | \
-  list2folder_cp_over \
-    "${TARGET_FOLDER}/${CLUSTER_KUSTOMIZATION_NAME}"
-
-  # Bootstrap (unless asked to skip)
-  if [[ "${SKIP_BOOTSTRAP,,}" == "true" ]]; then
-    return 0
-  fi
-
-  local CLUSTER_KUBECONFIG_SECRET_NAME="${CLUSTER_KUSTOMIZATION_NAME}-admin-kubeconfig"
-  local CLUSTER_KUBECONFIG_SECRET_KEY="kubeconfig"
-  local BOOTSTRAP_KUSTOMIZATION_NAMESPACE="${HOSTED_CLUSTERS_PROJECT}"
-  local CLUSTER_KUSTOMIZATION_NAMESPACE="managed-resources"
-  local BOOTSTRAP_SECRET_NAMESPACE="managed-resources"
-
-  create_bootstrap_for_remote_cluster \
-    "${CLUSTER_NAME}" \
-    "${CLUSTER_KUSTOMIZATION_NAME}" \
-    "${FLEET_REPO_DIR}" \
-    "${SW_CATALOGS_REPO_DIR}" \
-    "${FLEET_REPO_URL}" \
-    "${SW_CATALOGS_REPO_URL}" \
-    "${MGMT_PROJECT_NAME}" \
-    "${PUBLIC_KEY_ACM}" \
-    "${PUBLIC_KEY_NEW_CLUSTER}" \
-    "${PRIVATE_KEY_NEW_CLUSTER}" \
-    "false" \
-    "${MGMT_CLUSTER_NAME}" \
-    "${CLUSTER_KUBECONFIG_SECRET_NAME}" \
-    "${CLUSTER_KUBECONFIG_SECRET_KEY}" \
-    "${SW_CATALOGS_REPO_DIR}/cloud-resources/flux-remote-bootstrap/cluster-base-openshift/templates" \
-    "${BOOTSTRAP_KUSTOMIZATION_NAMESPACE}" \
-    "${CLUSTER_KUSTOMIZATION_NAMESPACE}" \
-    "${BOOTSTRAP_SECRET_NAMESPACE}"
-
-}
-
-# Update remote Openshift cluster via ACM
-function update_openshift_cluster {
-  local CLUSTER_KUSTOMIZATION_NAME="${1}"
-  local CLUSTER_NAME="${2}"
-  # This has to be void. Stored in database
-  local K8S_VERSION="${3:-"''"}"
-  # SOPS-AGE related
-  local PUBLIC_KEY_ACM="${4}"
-  local PUBLIC_KEY_NEW_CLUSTER="${5:-"${PUBLIC_KEY_NEW_CLUSTER}"}"
-  local PRIVATE_KEY_NEW_CLUSTER="${6:-"${PRIVATE_KEY_NEW_CLUSTER}"}"
-  # OpenShift specific
-  local OPENSHIFT_RELEASE="${7}"
-  local INFRA_PUBLIC_SSH_KEY="${8}"
-  local CONTROL_PLANE_AVAILABILITY="${9}"
-  local WORKER_COUNT="${10}"
-  local WORKER_CORES="${11}"
-  local WORKER_MEMORY="${12}"
-  local WORKER_VOLUME_SIZE="${13}"
-  local STORAGE_CLASS="${14}"
-  local BASE_DOMAIN="${15}"
-  local MGMT_CLUSTER_NAME="${16}"
-  local HOSTED_CLUSTERS_PROJECT="${17:-"clusters"}"
-  local ETCD_VOLUME_SIZE="${18:-"8"}"
-  # GitOps retaled
-  local FLEET_REPO_DIR="${19:-"${FLEET_REPO_DIR}"}"
-  local FLEET_REPO_URL="${20:-"${FLEET_REPO_URL}"}"
-  local SW_CATALOGS_REPO_DIR="${21:-"${SW_CATALOGS_REPO_DIR}"}"
-  local SW_CATALOGS_REPO_URL="${22:-"${SW_CATALOGS_REPO_URL}"}"
-  local SKIP_BOOTSTRAP="${23:-"true"}"
-  # Only change if absolutely needeed
-  local MGMT_PROJECT_NAME="${24:-"osm_admin"}"
-  
-  # Determine key folders in Fleet
-  local MGMT_RESOURCES_DIR="${FLEET_REPO_DIR}/${MGMT_PROJECT_NAME}/managed-resources/${MGMT_CLUSTER_NAME}"
-
-
-  create_openshift_cluster \
-    "${CLUSTER_KUSTOMIZATION_NAME}" \
-    "${CLUSTER_NAME}" \
-    "${K8S_VERSION}" \
-    "${PUBLIC_KEY_ACM}" \
-    "${PUBLIC_KEY_NEW_CLUSTER}" \
-    "${PRIVATE_KEY_NEW_CLUSTER}" \
-    "${OPENSHIFT_RELEASE}" \
-    "${INFRA_PUBLIC_SSH_KEY}" \
-    "${CONTROL_PLANE_AVAILABILITY}" \
-    "${WORKER_COUNT}" \
-    "${WORKER_CORES}" \
-    "${WORKER_MEMORY}" \
-    "${WORKER_VOLUME_SIZE}" \
-    "${STORAGE_CLASS}" \
-    "${BASE_DOMAIN}" \
-    "${MGMT_CLUSTER_NAME}" \
-    "${HOSTED_CLUSTERS_PROJECT}" \
-    "${ETCD_VOLUME_SIZE}" \
-    "${FLEET_REPO_DIR}" \
-    "${FLEET_REPO_URL}" \
-    "${SW_CATALOGS_REPO_DIR}" \
-    "${SW_CATALOGS_REPO_URL}" \
-    "${SKIP_BOOTSTRAP}" \
-    "${MGMT_PROJECT_NAME}"
-}
 
 # ----- Helper functions for adding/removing a profile from a cluster -----
 
@@ -2663,91 +1901,6 @@ function update_crossplane_providerconfig() {
     "${MGMT_CLUSTER_NAME}"
 }
 
-
-# Create a CloudConfig for CAPI provider
-function create_capi_openstack_cloudconf() {
-  local OPENSTACK_CLOUD_NAME="${1}"
-  local PUBLIC_KEY="${2:-"${PUBLIC_KEY_MGMT}"}"
-  local CONFIG_DIR="${3:-"${MGMT_ADDON_CONFIG_DIR}"}"
-
-  local NAMESPACE="managed-resources"
-
-  local CLOUDS_YAML="${OPENSTACK_CLOUDS_YAML}"
-  local CACERT="${OPENSTACK_CACERT}"
-
-  local CLOUD_CREDENTIALS_SECRET_NAME="${OPENSTACK_CLOUD_NAME}-capo-config"
-  local CLOUD_CREDENTIALS_CLOUDS_KEY="clouds.yaml"
-  local CLOUD_CREDENTIALS_CACERT_KEY="cacert"
-  local CLOUD_CREDENTIALS_FILENAME="credentials-secret.yaml"
-  
-  local CLOUD_CREDENTIALS_TOML_SECRET_NAME="${OPENSTACK_CLOUD_NAME}-capo-config-toml"
-  local CLOUD_CREDENTIALS_TOML_FILENAME="credentials-toml-secret.yaml"
-
-  local TARGET_FOLDER="${CONFIG_DIR}/capi-providerconfigs/capo/${OPENSTACK_CLOUD_NAME}-config"
-  mkdir -p "${TARGET_FOLDER}"
-
-  echo "" | \
-  make_generator \
-    "${CLOUD_CREDENTIALS_FILENAME}" \
-    kubectl_encrypt \
-      "${PUBLIC_KEY}" \
-      create \
-      secret \
-      generic \
-      "${CLOUD_CREDENTIALS_SECRET_NAME}" \
-      --namespace="${NAMESPACE}" \
-      --from-file="${CLOUD_CREDENTIALS_CLOUDS_KEY}"=<(echo "${CLOUDS_YAML}") \
-      --from-file="${CLOUD_CREDENTIALS_CACERT_KEY}"=<(echo "${CACERT}") \
-      -o=yaml \
-      --dry-run=client | \
-  make_generator \
-    "${CLOUD_CREDENTIALS_TOML_FILENAME}" \
-    kubectl_encrypt \
-      "${PUBLIC_KEY}" \
-      create \
-      secret \
-      generic \
-      "${CLOUD_CREDENTIALS_TOML_SECRET_NAME}" \
-      --namespace="${NAMESPACE}" \
-      --from-file="os_auth_url"=<(echo "${OS_AUTH_URL}") \
-      --from-file="os_region_name"=<(echo "${OS_REGION_NAME}") \
-      --from-file="os_username"=<(echo "${OS_USERNAME}") \
-      --from-file="os_password"=<(echo "${OS_PASSWORD}") \
-      --from-file="os_project_id"=<(echo "${OS_PROJECT_ID}") \
-      --from-file="os_project_domain_id"=<(echo "${OS_PROJECT_DOMAIN_ID}") \
-      -o=yaml \
-      --dry-run=client | \
-  list2folder_cp_over \
-    "${TARGET_FOLDER}"
-}
-
-# Update a CloudConfig for CAPI provider
-function update_capi_openstack_cloudconf() {
-  local CLOUD_CONFIG_NAME="${1}"
-  local PUBLIC_KEY="${2:-"${PUBLIC_KEY_MGMT}"}"
-  local CONFIG_DIR="${3:-"${MGMT_ADDON_CONFIG_DIR}"}"
-
-  delete_capi_openstack_cloudconf \
-    "${CLOUD_CONFIG_NAME}" \
-    "${CONFIG_DIR}"
-  
-  create_capi_openstack_cloudconf \
-    "${CLOUD_CONFIG_NAME}" \
-    "${PUBLIC_KEY}" \
-    "${CONFIG_DIR}"
-}
-
-
-# Delete a CloudConfig for CAPI provider
-function delete_capi_openstack_cloudconf() {
-  local OPENSTACK_CLOUD_NAME="$1"
-  local CONFIG_DIR="${2:-"${MGMT_ADDON_CONFIG_DIR}"}"
-
-  local TARGET_FOLDER="${CONFIG_DIR}/capi-providerconfigs/capo/${OPENSTACK_CLOUD_NAME}-config"
-  
-  # Delete the encrypted secrets files.
-  rm -rf "${TARGET_FOLDER}"
-}
 
 # Helper function to return the relative path of a location in SW Catalogs for an OKA
 function path_to_catalog() {

@@ -13,8 +13,8 @@
 #   limitations under the License.
 #
 
-source ../library/track
-source ../library/logging
+source ../common/track
+source ../common/logging
 
 RELEASE="test_track"
 OSM_DOCKER_TAG=latest

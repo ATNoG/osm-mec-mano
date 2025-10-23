@@ -42,7 +42,7 @@ echo "which osmclient:"
 which osm
 #dockers deb packages
 echo "dockers deb packages"
-for i in kafka keystone lcm mon mongo nbi prometheus ro mysql zookeeper; do
+for i in kafka keystone lcm mon mongo nbi pol prometheus ro mysql zookeeper; do
     echo "docker osm_$i"
     docker exec $(docker ps -q -f name=osm_$i -l) dpkg -l |grep osm
 done
@@ -50,6 +50,8 @@ done
 echo "dockers deb packages"
 echo "MON"
 docker exec -it $(docker ps -aqf "name=osm_mon" -n 1) dpkg -l |egrep -i "osm|n2vc"
+echo "POL"
+docker exec -it $(docker ps -aqf "name=osm_pol" -n 1) dpkg -l |egrep -i "osm|n2vc"
 echo "LCM"
 docker exec -it $(docker ps -aqf "name=osm_lcm" -n 1) dpkg -l |egrep -i "osm|n2vc"
 echo "NBI"
@@ -75,6 +77,9 @@ docker exec $(docker ps -q -f name=osm_nbi -l) git -C /app/NBI describe --tags -
 echo "docker osm_mon"
 docker exec $(docker ps -q -f name=osm_mon -l) git -C /mon rev-parse HEAD
 docker exec $(docker ps -q -f name=osm_mon -l) git -C /mon describe --tags --long --dirty
+echo "docker osm_pol"
+docker exec $(docker ps -q -f name=osm_pol -l) git -C /policy_module rev-parse HEAD
+docker exec $(docker ps -q -f name=osm_pol -l) git -C /policy_module describe --tags --long --dirty
 
 #Get configuration files
 echo "-------------------------------"

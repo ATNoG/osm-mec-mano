@@ -1,3 +1,4 @@
+{{- if not .Values.global.oldServiceAssurance -}}
 {{- if .Values.webhookTranslator.enabled -}}
 #######################################################################################
 # Copyright ETSI Contributors and Others.
@@ -78,4 +79,5 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+{{- end }}
 {{- end }}

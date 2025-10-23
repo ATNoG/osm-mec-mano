@@ -116,16 +116,44 @@ EOF"
     return 0
 }
 
+while getopts ":D:p:-: P" o; do
+    case "${o}" in
+        D)
+            OSM_DEVOPS="${OPTARG}"
+            ;;
+        p)
+            DOCKER_PROXY_URL="${OPTARG}"
+            ;;
+        P)
+            OSM_BEHIND_PROXY="y"
+            ;;
+        -)
+            [ "${OPTARG}" == "debug" ] && DEBUG_INSTALL="y" && continue
+            echo -e "Invalid option: '--$OPTARG'\n" >&2
+            exit 1
+            ;;
+        :)
+            echo "Option -$OPTARG requires an argument" >&2
+            exit 1
+            ;;
+        \?)
+            echo -e "Invalid option: '-$OPTARG'\n" >&2
+            exit 1
+            ;;
+        *)
+            exit 1
+            ;;
+    esac
+done
+
 DEBUG_INSTALL=${DEBUG_INSTALL:-}
-OSM_DEVOPS=${OSM_DEVOPS:-"/usr/share/osm-devops"}
 DOCKER_PROXY_URL=${DOCKER_PROXY_URL:-}
 OSM_BEHIND_PROXY=${OSM_BEHIND_PROXY:-}
 echo "DEBUG_INSTALL=$DEBUG_INSTALL"
-echo "OSM_DEVOPS=$OSM_DEVOPS"
 echo "DOCKER_PROXY_URL=$DOCKER_PROXY_URL"
 echo "OSM_BEHIND_PROXY=$OSM_BEHIND_PROXY"
 echo "USER=$USER"
 
-source $OSM_DEVOPS/library/logging
+source $OSM_DEVOPS/common/logging
 
 install_docker_ce

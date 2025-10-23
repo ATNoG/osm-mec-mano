@@ -1,0 +1,28 @@
+#######################################################################################
+# Copyright ETSI Contributors and Others.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#######################################################################################
+
+# Transitent file to be sourced to bootstrap some key variables
+
+# Random passwords
+export GITEA_ADMINISTRATOR_PASSWORD=$(apg -a 1 -M sncl -n 1 -m 12 -x 12 -E \\\*\'\"\`\$\<\>\{\}\,)
+export GITEA_STD_USER_PASS=$(apg -a 1 -M sncl -n 1 -m 10 -x 10 -E \\\*\'\"\`\$\<\>\{\}\,)
+
+# Uncomment to deploy Gitea only as ClusterIP service (i.e., no LoadBalancer)
+# export GITEA_CHART_VALUES_FILE=values-all.yaml
+#
+# Uncomment to deploy Gitea using an Ingress for web services
+# export GITEA_CHART_VALUES_FILE=values-all.yaml

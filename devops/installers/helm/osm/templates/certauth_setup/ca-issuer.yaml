@@ -16,10 +16,9 @@
 # limitations under the License.
 #######################################################################################
 apiVersion: cert-manager.io/v1
-kind: Issuer
+kind: ClusterIssuer
 metadata:
   name: ca-issuer
-  namespace: {{ .Release.Namespace }}
 spec:
   ca:
     secretName: osm-ca

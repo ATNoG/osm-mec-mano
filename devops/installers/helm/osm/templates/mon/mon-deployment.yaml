@@ -57,6 +57,10 @@ spec:
             {{- toYaml .Values.global.securityContext | nindent 12 }}
           image: {{ include "osm.mon.image" . }}
           imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          {{- if not .Values.global.oldServiceAssurance }}
+          command: ["/bin/bash"]
+          args: ["scripts/dashboarder-start.sh"]
+          {{- end }}
           ports:
             - containerPort: 8662
               protocol: TCP

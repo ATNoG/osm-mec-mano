@@ -41,14 +41,19 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get --yes update && \
 
 ARG PYTHON3_OSM_COMMON_URL
 ARG PYTHON3_OSM_MON_URL
+ARG PYTHON3_N2VC_URL
 
 RUN curl $PYTHON3_OSM_COMMON_URL -o osm_common.deb
 RUN dpkg -i ./osm_common.deb
+
+RUN curl $PYTHON3_N2VC_URL -o n2vc.deb
+RUN dpkg -i ./n2vc.deb
 
 RUN curl $PYTHON3_OSM_MON_URL -o osm_mon.deb
 RUN dpkg -i ./osm_mon.deb
 
 RUN pip3 install \
+    -r /usr/lib/python3/dist-packages/n2vc/requirements.txt \
     -r /usr/lib/python3/dist-packages/osm_common/requirements.txt \
     -r /usr/lib/python3/dist-packages/osm_mon/requirements.txt
 
@@ -132,4 +137,4 @@ EXPOSE 8000
 HEALTHCHECK --start-period=120s --interval=5s --timeout=2s --retries=12\
   CMD osm-mon-healthcheck || exit 1
 
-CMD /bin/bash scripts/dashboarder-start.sh
+CMD /bin/bash scripts/start.sh
