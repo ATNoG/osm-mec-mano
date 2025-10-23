@@ -105,6 +105,12 @@ airflow:
       image:
         repository: bitnamilegacy/mongodb-exporter
   fullnameOverride: "airflow"
+  createUserJob:
+    useHelmHooks: false
+    applyCustomEnv: false
+  migrateDatabaseJob:
+    useHelmHooks: false
+    applyCustomEnv: false
   config:
     core:
       parallelism: 4
