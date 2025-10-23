@@ -30,4 +30,19 @@ readinessProbe:
   timeoutSeconds: 10
   failureThreshold: 10
   successThreshold: 1
-
+  
+image:
+  repository: bitnamilegacy/mongodb
+tls:
+  image:
+    repository: bitnamilegacy/nginx
+externalAccess:
+  autoDiscovery:
+    image:
+      repository: bitnamilegacy/kubectl
+volumePermissions:
+  image:
+    repository: bitnamilegacy/bitnami-shell
+metrics:
+  image:
+    repository: bitnamilegacy/mongodb-exporter

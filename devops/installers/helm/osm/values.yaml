@@ -201,17 +201,44 @@ grafana:
 
 kafka:
   enabled: true
+  image:
+    repository: bitnamilegacy/kafka
+  externalAccess:
+    enabled: true
+    autoDiscovery:
+      enabled: true
+      image:
+        repository: bitnamilegacy/kubectl
+    controller:
+      service:
+        type: NodePort
+        nodePorts:
+          - 31999
+  serviceAccount:
+    create: true
+  volumePermissions:
+    image:
+      repository: bitnamilegacy/os-shell
+  metrics:
+    jmx:
+      image:
+        repository: bitnamilegacy/jmx-exporter
   listeners:
     client:
       protocol: "PLAINTEXT"
   fullnameOverride: "kafka"
   replicaCount: 1
+  rbac:
+    create: true
   controller:
     replicaCount: 1
+    automountServiceAccountToken: true
     resources:
       limits:
         memory: 1024Mi
     heapOpts: -Xmx768m -Xms768m
+  broker:
+    automountServiceAccountToken: true
   extraConfigYaml:
     default.replication.factor: 1
     offsets.topic.replication.factor: 1
@@ -268,7 +295,14 @@ mon:
 mysql:
   enabled: false
   image:
+    repository: bitnamilegacy/mysql
     tag: "8.1-debian-11"
+  volumePermissions:
+    image:
+      repository: bitnamilegacy/os-shell
+  metrics:
+    image:
+      repository: bitnamilegacy/mysqld-exporter
   fullnameOverride: "mysql"
 
 nbi:

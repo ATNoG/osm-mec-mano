@@ -15,7 +15,7 @@
 REPOSITORY_BASE=https://osm-download.etsi.org/repository/osm/debian
 RELEASE=ReleaseSEVENTEEN
 REPOSITORY=stable
-DOCKER_TAG="testing-daily"
+DOCKER_TAG="17"
 DEVOPS_PATH=/usr/share/osm-devops
 
 function usage(){
