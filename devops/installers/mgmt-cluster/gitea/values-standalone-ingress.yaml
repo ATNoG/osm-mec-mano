@@ -437,6 +437,7 @@ memcached:
   enabled: true
   image:
     repository: bitnamilegacy/memcached
+    tag: 1.6.9
   service:
     port: 11211
 
@@ -452,6 +453,7 @@ postgresql:
   enabled: true
   image:
     repository: bitnamilegacy/postgresql
+    tag: 11.11.0
   global:
     postgresql:
       postgresqlDatabase: gitea
