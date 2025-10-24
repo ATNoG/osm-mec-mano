@@ -431,6 +431,8 @@ gitea:
 ## @param memcached.service.port Port for Memcached
 memcached:
   enabled: true
+  image:
+    repository: bitnamilegacy/memcached
   service:
     port: 11211
 
@@ -444,6 +446,8 @@ memcached:
 ## @param postgresql.persistence.size PVC Storage Request for PostgreSQL volume
 postgresql:
   enabled: true
+  image:
+    repository: bitnamilegacy/postgresql
   global:
     postgresql:
       postgresqlDatabase: gitea
