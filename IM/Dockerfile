@@ -41,8 +41,10 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
         python3-pip \
         tox
 
+#RUN DEBIAN_FRONTEND=noninteractive apt install software-properties-common -y
+#RUN DEBIAN_FRONTEND=noninteractive add-apt-repository ppa:openjdk-r/ppa
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get -y install wget build-essential dh-make \
-                                              openjdk-19-jdk maven
-RUN update-java-alternatives --jre-headless --set /usr/lib/jvm/java-1.19.0-openjdk-amd64
+                                              openjdk-21-jdk maven
+RUN update-java-alternatives --jre-headless --set /usr/lib/jvm/java-1.21.0-openjdk-amd64
 

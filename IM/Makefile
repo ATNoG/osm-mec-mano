@@ -17,7 +17,7 @@
 # NOTE: pyang and pyangbind are required for build
 
 .PHONY: all clean package trees yang-ietf openapi_schemas yang2swagger
-JAVA := /usr/lib/jvm/java-19-openjdk-amd64/bin/java
+JAVA := /usr/lib/jvm/java-21-openjdk-amd64/bin/java
 PYANG := pyang
 ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
     PYTHON_INTERPRETER := python
